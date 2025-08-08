@@ -1,0 +1,39 @@
+{
+  "name": "course-service",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "course-service/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "webpack-cli build",
+        "args": ["--node-env=production"]
+      },
+      "configurations": {
+        "development": {
+          "args": ["--node-env=development"]
+        }
+      }
+    },
+    "serve": {
+      "continuous": true,
+      "executor": "@nx/js:node",
+      "defaultConfiguration": "development",
+      "dependsOn": ["build"],
+      "options": {
+        "buildTarget": "course-service:build",
+        "runBuildTargetDependencies": false
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "course-service:build:development"
+        },
+        "production": {
+          "buildTarget": "course-service:build:production"
+        }
+      }
+    }
+  },
+  "tags": []
+}
