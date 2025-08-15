@@ -1,10 +1,28 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { SharedDatabaseModule } from '@edutech-lms/database';
+import { SharedAuthModule } from '@edutech-lms/auth';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AuthController } from './auth/auth.controller';
+import { AuthService } from './auth/auth.service';
+import { UserService } from './user/user.service';
+import { OrganizationService } from './organization/organization.service';
+import { User, Organization } from '@edutech-lms/database';
+import { configuration } from '@edutech-lms/common';
 
 @Module({
-  imports: [],
-  controllers: [AppController],
-  providers: [AppService],
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load: [configuration],
+    }),
+    SharedDatabaseModule,
+    SharedAuthModule,
+    TypeOrmModule.forFeature([User, Organization]),
+  ],
+  controllers: [AppController, AuthController],
+  providers: [AppService, AuthService, UserService, OrganizationService],
 })
 export class AppModule {}

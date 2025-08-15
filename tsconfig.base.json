@@ -15,9 +15,9 @@
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
     "paths": {
+      "@edutech-lms/auth": ["libs/shared/auth/src/index.ts"],
       "@edutech-lms/common": ["libs/shared/common/src/index.ts"],
       "@edutech-lms/database": ["libs/shared/database/src/index.ts"],
-      "@edutech-lms/auth": ["libs/shared/auth/src/index.ts"],
       "@edutech-lms/events": ["libs/shared/events/src/index.ts"]
     }
   },

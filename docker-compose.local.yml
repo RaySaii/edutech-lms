@@ -1,0 +1,15 @@
+version: '3.8'
+
+# Simplified local development without Docker
+# You can install these services locally instead:
+
+# PostgreSQL: brew install postgresql
+# Redis: brew install redis  
+# RabbitMQ: brew install rabbitmq
+
+# Then run:
+# brew services start postgresql
+# brew services start redis
+# brew services start rabbitmq
+
+# Or use Docker alternatives like Podman if preferred
