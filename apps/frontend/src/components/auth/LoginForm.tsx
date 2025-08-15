@@ -23,10 +23,39 @@ export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+
+  const validateForm = () => {
+    let isValid = true;
+    setEmailError('');
+    setPasswordError('');
+
+    // Email validation
+    if (!credentials.email) {
+      setEmailError('Email is required');
+      isValid = false;
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(credentials.email)) {
+      setEmailError('Please enter a valid email address');
+      isValid = false;
+    }
+
+    // Password validation
+    if (!credentials.password) {
+      setPasswordError('Password is required');
+      isValid = false;
+    }
+
+    return isValid;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!validateForm()) {
+      return;
+    }
 
     try {
       const response = await login(credentials);
@@ -46,6 +75,14 @@ export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
       ...prev,
       [name]: value
     }));
+    
+    // Clear validation errors when user starts typing
+    if (name === 'email' && emailError) {
+      setEmailError('');
+    }
+    if (name === 'password' && passwordError) {
+      setPasswordError('');
+    }
   };
 
   return (
@@ -82,8 +119,11 @@ export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
                   data-testid="email-input"
                   aria-label="Email Address"
                 />
-                {/* HTML5 validation error placeholder */}
-                <span data-testid="email-validation-error" className="hidden"></span>
+                {emailError && (
+                  <span data-testid="email-validation-error" className="text-red-500 text-sm mt-1 block">
+                    {emailError}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -120,8 +160,11 @@ export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
                     <Eye className="h-4 w-4 text-muted-foreground" />
                   )}
                 </Button>
-                {/* HTML5 validation error placeholder */}
-                <span data-testid="password-validation-error" className="hidden"></span>
+                {passwordError && (
+                  <span data-testid="password-validation-error" className="text-red-500 text-sm mt-1 block">
+                    {passwordError}
+                  </span>
+                )}
               </div>
             </div>
 

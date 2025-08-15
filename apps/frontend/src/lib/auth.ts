@@ -1,7 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 import { LoginCredentials, RegisterData, AuthResponse, AuthTokens, User } from '../types/auth';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
 
 class AuthAPI {
   private api: AxiosInstance;

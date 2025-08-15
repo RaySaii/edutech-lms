@@ -1,6 +1,7 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { UserService } from './user.service';
+import { UserRole } from '@edutech-lms/shared/common';
 
 @Controller()
 export class UserController {
@@ -28,7 +29,7 @@ export class UserController {
   }
 
   @MessagePattern({ cmd: 'update_user_role' })
-  async updateUserRole(@Payload() data: { userId: string; role: string; adminId: string }) {
+  async updateUserRole(@Payload() data: { userId: string; role: UserRole; adminId: string }) {
     return this.userService.updateUserRole(data.userId, data.role, data.adminId);
   }
 
