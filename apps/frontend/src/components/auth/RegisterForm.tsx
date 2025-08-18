@@ -1,9 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { RegisterData } from '../../types/auth';
-import { Eye, EyeOff, Mail, Lock, User, Phone, Building, AlertCircle, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { useToast } from '../ui/toast';
+import { authAPI } from '../../lib/auth';
+import { useDebounce } from 'ahooks';
 
 interface RegisterFormProps {
   onSuccess?: () => void;
@@ -12,14 +15,13 @@ interface RegisterFormProps {
 
 export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
   const { register, isLoading } = useAuth();
+  const { showSuccess, showError } = useToast();
   const [formData, setFormData] = useState<RegisterData>({
     email: '',
     password: '',
     confirmPassword: '',
     firstName: '',
     lastName: '',
-    phone: '',
-    organizationSlug: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -31,6 +33,13 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
     score: 0,
     requirements: [],
   });
+  const [emailStatus, setEmailStatus] = useState<{
+    checking: boolean;
+    available?: boolean;
+    message?: string;
+  }>({
+    checking: false,
+  });
 
   const validatePassword = (password: string) => {
     const requirements = [
@@ -38,12 +47,45 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
       { met: /[A-Z]/.test(password), text: 'One uppercase letter' },
       { met: /[a-z]/.test(password), text: 'One lowercase letter' },
       { met: /\d/.test(password), text: 'One number' },
-      { met: /[!@#$%^&*(),.?":{}|<>]/.test(password), text: 'One special character' },
     ];
-    
+
     const score = requirements.filter(req => req.met).length;
     return { score, requirements };
   };
+
+  const debouncedEmail = useDebounce(formData.email, { wait: 500 });
+
+  const checkEmailAvailability = useCallback(async (email: string) => {
+    if (!email || !email.includes('@')) {
+      setEmailStatus({ checking: false });
+      return;
+    }
+
+    setEmailStatus({ checking: true });
+
+    try {
+      const result = await authAPI.checkEmailAvailability(email);
+      setEmailStatus({
+        checking: false,
+        available: result.available,
+        message: result.message,
+      });
+    } catch (error) {
+      setEmailStatus({
+        checking: false,
+        available: true,
+        message: 'Unable to check email availability',
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (debouncedEmail) {
+      checkEmailAvailability(debouncedEmail);
+    } else {
+      setEmailStatus({ checking: false });
+    }
+  }, [debouncedEmail, checkEmailAvailability]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,15 +103,31 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
       return;
     }
 
+    // Validate email availability - prevent form submission if email exists
+    if (emailStatus.available === false) {
+      setError('This email is already registered. Please sign in or reset your password.');
+      return;
+    }
+
     try {
-      const response = await register(formData);
+      // Remove confirmPassword before sending to backend
+      const { confirmPassword, ...registrationData } = formData;
+      const response = await register(registrationData);
       if (response.success) {
+        showSuccess(
+          'Registration Successful!',
+          'Your account has been created successfully. Welcome to EduTech LMS!'
+        );
         onSuccess?.();
       } else {
-        setError(response.message || 'Registration failed');
+        const errorMessage = response.message || 'Registration failed';
+        setError(errorMessage);
+        showError('Registration Failed', errorMessage);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Registration failed');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Registration failed';
+      setError(errorMessage);
+      showError('Registration Error', errorMessage);
     }
   };
 
@@ -99,29 +157,29 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
   };
 
   return (
-    <div className="w-full max-w-lg mx-auto">
-      <div className="bg-white rounded-lg shadow-lg p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Create Account</h1>
-          <p className="text-gray-600 mt-2">Join our learning platform</p>
+    <div className="w-full max-w-md mx-auto">
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Create Account</h1>
+          <p className="text-gray-600 mt-1">Join our learning platform</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4" data-testid="register-form">
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-4 flex items-center">
+            <div className="bg-red-50 border border-red-200 rounded-md p-4 flex items-center" data-testid="error-message">
               <AlertCircle className="h-5 w-5 text-red-400 mr-3" />
               <p className="text-red-700 text-sm">{error}</p>
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
                 First Name
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="h-5 w-5 text-gray-400" />
+                  <User className="h-4 w-4 text-gray-400" />
                 </div>
                 <input
                   id="firstName"
@@ -130,20 +188,21 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
                   required
                   value={formData.firstName}
                   onChange={handleChange}
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="block w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   placeholder="John"
                   disabled={isLoading}
+                  data-testid="first-name-input"
                 />
               </div>
             </div>
 
             <div>
-              <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
                 Last Name
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="h-5 w-5 text-gray-400" />
+                  <User className="h-4 w-4 text-gray-400" />
                 </div>
                 <input
                   id="lastName"
@@ -152,21 +211,22 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
                   required
                   value={formData.lastName}
                   onChange={handleChange}
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="block w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   placeholder="Doe"
                   disabled={isLoading}
+                  data-testid="last-name-input"
                 />
               </div>
             </div>
           </div>
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
               Email Address
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Mail className="h-5 w-5 text-gray-400" />
+                <Mail className="h-4 w-4 text-gray-400" />
               </div>
               <input
                 id="email"
@@ -176,65 +236,60 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
                 required
                 value={formData.email}
                 onChange={handleChange}
-                className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={`block w-full pl-9 pr-10 py-2.5 border rounded-md placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent text-sm ${
+                  emailStatus.available === false
+                    ? 'border-red-300 focus:ring-red-500'
+                    : emailStatus.available === true
+                    ? 'border-green-300 focus:ring-green-500'
+                    : 'border-gray-300 focus:ring-blue-500'
+                }`}
                 placeholder="john@example.com"
                 disabled={isLoading}
+                data-testid="email-input"
               />
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
-              Phone Number <span className="text-gray-400">(optional)</span>
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Phone className="h-5 w-5 text-gray-400" />
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                {formData.email ? (
+                  <Loader2 className="h-4 w-4 text-gray-400 animate-spin" />
+                ) : null}
               </div>
-              <input
-                id="phone"
-                name="phone"
-                type="tel"
-                value={formData.phone}
-                onChange={handleChange}
-                className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="+1 (555) 123-4567"
-                disabled={isLoading}
-              />
             </div>
-          </div>
-
-          <div>
-            <label htmlFor="organizationSlug" className="block text-sm font-medium text-gray-700 mb-2">
-              Organization Code <span className="text-gray-400">(optional)</span>
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Building className="h-5 w-5 text-gray-400" />
+            {emailStatus.message && formData.email && (
+              <div className={`text-xs mt-1 ${
+                emailStatus.available === false ? 'text-red-600' : 'text-green-600'
+              }`}>
+                <p>{emailStatus.message}</p>
+                {emailStatus.available === false && (
+                  <p className="mt-1">
+                    Already have an account?{' '}
+                    <button
+                      type="button"
+                      onClick={onLoginClick}
+                      className="text-blue-600 hover:text-blue-500 underline font-medium"
+                    >
+                      Sign in
+                    </button>
+                    {' '}or{' '}
+                    <a
+                      href="/forgot-password"
+                      className="text-blue-600 hover:text-blue-500 underline font-medium"
+                    >
+                      forgot password?
+                    </a>
+                  </p>
+                )}
               </div>
-              <input
-                id="organizationSlug"
-                name="organizationSlug"
-                type="text"
-                value={formData.organizationSlug}
-                onChange={handleChange}
-                className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="your-org-code"
-                disabled={isLoading}
-              />
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Leave blank to create your own organization
-            </p>
+            )}
           </div>
 
+
+
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
               Password
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock className="h-5 w-5 text-gray-400" />
+                <Lock className="h-4 w-4 text-gray-400" />
               </div>
               <input
                 id="password"
@@ -244,9 +299,10 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
                 required
                 value={formData.password}
                 onChange={handleChange}
-                className="block w-full pl-10 pr-12 py-3 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="block w-full pl-9 pr-10 py-2.5 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 placeholder="Create a strong password"
                 disabled={isLoading}
+                data-testid="password-input"
               />
               <button
                 type="button"
@@ -255,19 +311,19 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
                 disabled={isLoading}
               >
                 {showPassword ? (
-                  <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                  <EyeOff className="h-4 w-4 text-gray-400 hover:text-gray-600" />
                 ) : (
-                  <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                  <Eye className="h-4 w-4 text-gray-400 hover:text-gray-600" />
                 )}
               </button>
             </div>
-            
+
             {formData.password && (
               <div className="mt-2">
                 <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
                   <span>Password strength</span>
                   <span className={`font-medium ${
-                    passwordStrength.score < 2 ? 'text-red-600' : 
+                    passwordStrength.score < 2 ? 'text-red-600' :
                     passwordStrength.score < 4 ? 'text-yellow-600' : 'text-green-600'
                   }`}>
                     {getStrengthText(passwordStrength.score)}
@@ -276,7 +332,7 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div
                     className={`h-2 rounded-full transition-all duration-300 ${getStrengthColor(passwordStrength.score)}`}
-                    style={{ width: `${(passwordStrength.score / 5) * 100}%` }}
+                    style={{ width: `${(passwordStrength.score / 4) * 100}%` }}
                   ></div>
                 </div>
                 <div className="mt-2 space-y-1">
@@ -298,12 +354,12 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
           </div>
 
           <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
               Confirm Password
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock className="h-5 w-5 text-gray-400" />
+                <Lock className="h-4 w-4 text-gray-400" />
               </div>
               <input
                 id="confirmPassword"
@@ -313,9 +369,10 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
                 required
                 value={formData.confirmPassword}
                 onChange={handleChange}
-                className="block w-full pl-10 pr-12 py-3 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="block w-full pl-9 pr-10 py-2.5 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 placeholder="Confirm your password"
                 disabled={isLoading}
+                data-testid="confirm-password-input"
               />
               <button
                 type="button"
@@ -324,9 +381,9 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
                 disabled={isLoading}
               >
                 {showConfirmPassword ? (
-                  <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                  <EyeOff className="h-4 w-4 text-gray-400 hover:text-gray-600" />
                 ) : (
-                  <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                  <Eye className="h-4 w-4 text-gray-400 hover:text-gray-600" />
                 )}
               </button>
             </div>
@@ -358,7 +415,8 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
           <button
             type="submit"
             disabled={isLoading || passwordStrength.score < 4}
-            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+            className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+            data-testid="register-submit"
           >
             {isLoading ? (
               <div className="flex items-center">
@@ -377,6 +435,7 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
                 type="button"
                 onClick={onLoginClick}
                 className="font-medium text-blue-600 hover:text-blue-500"
+                data-testid="login-link"
               >
                 Sign in
               </button>

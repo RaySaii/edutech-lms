@@ -53,19 +53,49 @@ export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
     e.preventDefault();
     setError('');
 
+
     if (!validateForm()) {
       return;
     }
 
     try {
       const response = await login(credentials);
+
       if (response.success) {
         onSuccess?.();
       } else {
-        setError(response.message || 'Login failed');
+        let errorMessage = 'Invalid email or password';
+
+        // Use generic error message for all authentication failures (security best practice)
+        if (response.status === 401 || response.status === 404 || 
+            response.error === 'INVALID_CREDENTIALS' || response.error === 'USER_NOT_FOUND' ||
+            response.message?.toLowerCase().includes('invalid credentials') ||
+            response.message?.toLowerCase().includes('user not found')) {
+          errorMessage = 'Invalid email or password. Please try again.';
+        } else if (response.status === 400 || response.message?.toLowerCase().includes('account locked')) {
+          errorMessage = 'Your account has been temporarily locked. Please try again later.';
+        } else if (response.message?.toLowerCase().includes('account disabled')) {
+          errorMessage = 'Your account has been disabled. Please contact support.';
+        } else {
+          errorMessage = 'Invalid email or password. Please try again.';
+        }
+
+        setError(errorMessage);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Login failed');
+    } catch (err: unknown) {
+      let errorMessage = 'An unexpected error occurred. Please try again.';
+
+      if (err instanceof Error) {
+        if (err.message.toLowerCase().includes('network')) {
+          errorMessage = 'Network error. Please check your internet connection.';
+        } else if (err.message.toLowerCase().includes('timeout')) {
+          errorMessage = 'Request timed out. Please try again.';
+        } else if (err.message.toLowerCase().includes('server')) {
+          errorMessage = 'Server error. Please try again later.';
+        }
+      }
+
+      setError(errorMessage);
     }
   };
 
@@ -75,7 +105,7 @@ export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
       ...prev,
       [name]: value
     }));
-    
+
     // Clear validation errors when user starts typing
     if (name === 'email' && emailError) {
       setEmailError('');
@@ -182,8 +212,13 @@ export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
                 </Label>
               </div>
 
-              <Button variant="link" className="px-0 text-sm" asChild>
-                <a href="/forgot-password" data-testid="forgot-password-link">Forgot password?</a>
+              <Button 
+                variant="link" 
+                className="px-0 text-sm"
+                onClick={() => window.location.href = '/forgot-password'}
+                data-testid="forgot-password-link"
+              >
+                Forgot password?
               </Button>
             </div>
 

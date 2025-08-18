@@ -13,8 +13,8 @@ interface ProtectedRouteProps {
   fallback?: React.ReactNode;
 }
 
-export function ProtectedRoute({ 
-  children, 
+export function ProtectedRoute({
+  children,
   requireAuth = true,
   requiredRoles = [],
   redirectTo = '/login',
@@ -37,17 +37,6 @@ export function ProtectedRoute({
     }
   }, [isAuthenticated, isLoading, user, router, requireAuth, requiredRoles, redirectTo]);
 
-  // Show loading spinner while checking authentication
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
 
   // Show fallback if provided and user doesn't meet requirements
   if (requireAuth && !isAuthenticated) {
@@ -75,7 +64,7 @@ export function withAuth<P extends object>(
   };
 
   ProtectedComponent.displayName = `withAuth(${Component.displayName || Component.name})`;
-  
+
   return ProtectedComponent;
 }
 

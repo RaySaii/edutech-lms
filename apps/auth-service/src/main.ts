@@ -5,18 +5,15 @@ import { AppModule } from './app/app.module';
 
 async function bootstrap() {
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(AppModule, {
-    transport: Transport.RMQ,
+    transport: Transport.TCP,
     options: {
-      urls: ['amqp://admin:admin@localhost:5672'],
-      queue: 'auth_queue',
-      queueOptions: {
-        durable: false,
-      },
+      host: 'localhost',
+      port: 3001,
     },
   });
 
   await app.listen();
-  Logger.log('🚀 Auth Service is listening for messages');
+  Logger.log('🚀 Auth Service is listening on TCP port 3001');
 }
 
 bootstrap();

@@ -6,12 +6,18 @@ import helmet from 'helmet';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
+
   // Security
   app.use(helmet());
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3001',
+    origin: [
+      'http://localhost:4200', // Frontend dev server
+      'http://localhost:3001', // Alternative port
+      process.env.FRONTEND_URL
+    ].filter(Boolean),
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   });
 
   // Global prefix
@@ -37,7 +43,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  
+
   Logger.log(`🚀 API Gateway is running on: http://localhost:${port}/${globalPrefix}`);
   Logger.log(`📖 API Documentation: http://localhost:${port}/${globalPrefix}/docs`);
 }

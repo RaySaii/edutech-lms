@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { AuthContextType, User, AuthTokens, LoginCredentials, RegisterData, AuthResponse } from '../types/auth';
+import { AuthContextType, User, AuthTokens, LoginCredentials, RegisterData, BackendRegisterData, AuthResponse } from '../types/auth';
 import { authAPI } from '../lib/auth';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,7 +40,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
               // Tokens invalid, clear auth state
               await logout();
             }
-          } catch (error) {
+          } catch {
             // If fetching current user fails, try to refresh token
             try {
               const newTokens = await authAPI.refreshToken(storedTokens.refreshToken);
@@ -55,7 +55,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
               } else {
                 await logout();
               }
-            } catch (refreshError) {
+            } catch {
               // Refresh failed, clear auth state
               await logout();
             }
@@ -85,18 +85,46 @@ export function AuthProvider({ children }: AuthProviderProps) {
         
         authAPI.setStoredUser(userData);
         authAPI.setStoredTokens(tokensData);
+      } else {
+        // Handle HTTP status code based errors
+        if (!response.message) {
+          switch (response.status) {
+            case 404:
+              response.message = 'User not found';
+              break;
+            case 401:
+              response.message = 'Invalid credentials';
+              break;
+            default:
+              response.message = 'Login failed. Please try again.';
+          }
+        }
       }
       
       return response;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Login failed:', error);
-      throw error;
+      
+      // Transform error into a consistent response format
+      if (error instanceof Error) {
+        return {
+          success: false,
+          message: error.message.includes('fetch') 
+            ? 'Network error. Please check your connection.' 
+            : error.message
+        };
+      }
+      
+      return {
+        success: false,
+        message: 'An unexpected error occurred during login.'
+      };
     } finally {
       setIsLoading(false);
     }
   };
 
-  const register = async (data: RegisterData): Promise<AuthResponse> => {
+  const register = async (data: BackendRegisterData): Promise<AuthResponse> => {
     try {
       setIsLoading(true);
       const response = await authAPI.register(data);
@@ -112,7 +140,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
       
       return response;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Registration failed:', error);
       throw error;
     } finally {

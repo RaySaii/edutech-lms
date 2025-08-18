@@ -30,7 +30,7 @@ const PASSWORD_PATTERNS = {
 
 const STRENGTH_THRESHOLDS = {
   MEDIUM_SCORE: 3,
-  STRONG_SCORE: 5,
+  STRONG_SCORE: 4,
   LONG_PASSWORD_LENGTH: 12,
 } as const;
 
@@ -67,10 +67,6 @@ function buildPasswordRequirements(password: string): PasswordRequirement[] {
     {
       met: PASSWORD_PATTERNS.NUMBERS.test(password),
       text: 'One number'
-    },
-    {
-      met: PASSWORD_PATTERNS.SPECIAL_CHARS.test(password),
-      text: 'One special character'
     }
   ];
 }
@@ -112,7 +108,6 @@ function generateFeedback(password: string, requirements: PasswordRequirement[])
 function calculateEntropy(password: string): number {
   if (password.length === 0) return 0;
 
-  const charset = new Set(password);
   let poolSize = 0;
 
   // Estimate character pool size
@@ -122,7 +117,7 @@ function calculateEntropy(password: string): number {
   if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) poolSize += 32;
 
   // Add extra pool for unicode characters
-  const unicodeChars = password.match(/[^\x00-\x7F]/g);
+  const unicodeChars = password.match(/[^\u0020-\u007F]/g);
   if (unicodeChars) poolSize += unicodeChars.length;
 
   // Calculate entropy: log2(poolSize^length)

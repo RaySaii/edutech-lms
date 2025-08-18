@@ -44,14 +44,21 @@ export interface RegisterData {
   confirmPassword: string;
   firstName: string;
   lastName: string;
-  phone?: string;
-  organizationSlug?: string;
+}
+
+export interface BackendRegisterData {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
 }
 
 export interface AuthResponse {
   success: boolean;
-  message: string;
-  data: {
+  message?: string;
+  status?: number;
+  error?: string;
+  data?: {
     user: User;
     tokens: AuthTokens;
   };
@@ -63,7 +70,7 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (credentials: LoginCredentials) => Promise<AuthResponse>;
-  register: (data: RegisterData) => Promise<AuthResponse>;
+  register: (data: BackendRegisterData) => Promise<AuthResponse>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<AuthTokens>;
   forgotPassword: (email: string) => Promise<{ success: boolean; message: string }>;

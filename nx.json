@@ -32,31 +32,8 @@
         "targetName": "test"
       },
       "exclude": [
-        "apps/edutech-lms-e2e/**/*",
-        "api-gateway-e2e/**/*",
-        "auth-service-e2e/**/*",
-        "course-service-e2e/**/*",
-        "user-service-e2e/**/*",
-        "notification-service-e2e/**/*",
-        "analytics-service-e2e/**/*",
-        "api-gateway-e2e/**/*",
-        "auth-service-e2e/**/*",
-        "course-service-e2e/**/*",
-        "user-service-e2e/**/*",
-        "notification-service-e2e/**/*",
-        "analytics-service-e2e/**/*"
+        "apps/frontend-e2e/**/*"
       ]
-    },
-    {
-      "plugin": "@nx/react/router-plugin",
-      "options": {
-        "buildTargetName": "build",
-        "devTargetName": "dev",
-        "startTargetName": "start",
-        "watchDepsTargetName": "watch-deps",
-        "buildDepsTargetName": "build-deps",
-        "typecheckTargetName": "typecheck"
-      }
     },
     {
       "plugin": "@nx/playwright/plugin",

@@ -23,17 +23,19 @@ export default function AuthPage() {
           <p className="text-muted-foreground mt-2">Your Learning Management System</p>
         </div>
 
-        {isLogin ? (
-          <LoginForm 
-            onSuccess={handleSuccess}
-            onRegisterClick={() => setIsLogin(false)}
-          />
-        ) : (
-          <RegisterForm 
-            onSuccess={handleSuccess}
-            onLoginClick={() => setIsLogin(true)}
-          />
-        )}
+        <div data-testid="auth-container">
+          {isLogin ? (
+            <LoginForm 
+              onSuccess={handleSuccess}
+              onRegisterClick={() => setIsLogin(false)}
+            />
+          ) : (
+            <RegisterForm 
+              onSuccess={handleSuccess}
+              onLoginClick={() => setIsLogin(true)}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

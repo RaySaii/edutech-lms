@@ -1,7 +1,7 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { UserService } from './user.service';
-import { UserRole } from '@edutech-lms/shared/common';
+import { UserRole } from '@edutech-lms/common';
 
 @Controller()
 export class UserController {

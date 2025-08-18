@@ -43,7 +43,8 @@ export class AuthService {
   }
 
   async hashPassword(password: string): Promise<string> {
-    const rounds = this.configService.get<number>('BCRYPT_ROUNDS', 12);
+    const rounds = parseInt(this.configService.get('BCRYPT_ROUNDS', '12'), 10);
+    console.log('BCRYPT_ROUNDS from config:', this.configService.get('BCRYPT_ROUNDS'), 'parsed as:', rounds);
     return bcrypt.hash(password, rounds);
   }
 

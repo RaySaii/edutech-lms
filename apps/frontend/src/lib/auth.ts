@@ -1,14 +1,14 @@
 import axios, { AxiosInstance } from 'axios';
-import { LoginCredentials, RegisterData, AuthResponse, AuthTokens, User } from '../types/auth';
+import { LoginCredentials, RegisterData, BackendRegisterData, AuthResponse, AuthTokens, User } from '../types/auth';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
 
 class AuthAPI {
   private api: AxiosInstance;
 
   constructor() {
     this.api = axios.create({
-      baseURL: `${API_BASE_URL}/api/auth`,
+      baseURL: `${API_BASE_URL}/auth`,
       headers: {
         'Content-Type': 'application/json',
       },
@@ -40,7 +40,7 @@ class AuthAPI {
             if (tokens?.refreshToken) {
               const newTokens = await this.refreshToken(tokens.refreshToken);
               this.setStoredTokens(newTokens);
-              
+
               // Retry the original request with new token
               originalRequest.headers.Authorization = `Bearer ${newTokens.accessToken}`;
               return this.api(originalRequest);
@@ -59,13 +59,77 @@ class AuthAPI {
   }
 
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    const response = await this.api.post('/login', credentials);
-    return response.data;
+    try {
+      const response = await this.api.post('/login', credentials);
+      return {
+        success: true,
+        data: response.data,
+        status: response.status
+      };
+    } catch (error: any) {
+      const status = error.response?.status || 500;
+      const message = error.response?.data?.message || error.message;
+
+      // Debug: Log error for troubleshooting
+      console.error('Login API error:', { status, message });
+
+      return {
+        success: false,
+        message,
+        status,
+        error: this.getErrorCodeFromStatus(status, message)
+      };
+    }
   }
 
-  async register(data: RegisterData): Promise<AuthResponse> {
-    const response = await this.api.post('/register', data);
-    return response.data;
+  async register(data: BackendRegisterData): Promise<AuthResponse> {
+    try {
+      const response = await this.api.post('/register', data);
+      return {
+        success: true,
+        data: response.data,
+        status: response.status
+      };
+    } catch (error: any) {
+      const status = error.response?.status || 500;
+      const message = error.response?.data?.message || error.message;
+
+      // Debug: Log full error details for troubleshooting
+      console.error('Registration API error details:', {
+        status,
+        message,
+        fullResponse: error.response?.data,
+        requestData: data,
+        validation: error.response?.data?.details || error.response?.data?.validation
+      });
+
+      return {
+        success: false,
+        message,
+        status,
+        error: this.getErrorCodeFromStatus(status, message)
+      };
+    }
+  }
+
+  private getErrorCodeFromStatus(status: number, message: string): string {
+    switch (status) {
+      case 404:
+        return 'USER_NOT_FOUND';
+      case 401:
+        return 'INVALID_CREDENTIALS';
+      case 400:
+        if (message.toLowerCase().includes('already registered')) {
+          return 'EMAIL_ALREADY_EXISTS';
+        }
+        return 'BAD_REQUEST';
+      case 409:
+        return 'CONFLICT';
+      case 500:
+        return 'INTERNAL_ERROR';
+      default:
+        return 'UNKNOWN_ERROR';
+    }
   }
 
   async refreshToken(refreshToken: string): Promise<AuthTokens> {
@@ -86,8 +150,8 @@ class AuthAPI {
     this.clearStoredTokens();
   }
 
-  async forgotPassword(email: string): Promise<{ success: boolean; message: string }> {
-    const response = await this.api.post('/forgot-password', { email });
+  async forgotPassword(data: { email: string }): Promise<{ success: boolean; message: string }> {
+    const response = await this.api.post('/forgot-password', data);
     return response.data;
   }
 
@@ -109,19 +173,24 @@ class AuthAPI {
   // Token storage methods
   getStoredTokens(): AuthTokens | null {
     if (typeof window === 'undefined') return null;
-    
+
     try {
       const stored = localStorage.getItem('auth_tokens');
-      return stored ? JSON.parse(stored) : null;
+      if (!stored || stored === 'undefined' || stored === 'null') {
+        return null;
+      }
+      return JSON.parse(stored);
     } catch (error) {
       console.warn('Failed to parse stored tokens:', error);
+      // Clear corrupted data
+      localStorage.removeItem('auth_tokens');
       return null;
     }
   }
 
   setStoredTokens(tokens: AuthTokens): void {
     if (typeof window === 'undefined') return;
-    
+
     try {
       localStorage.setItem('auth_tokens', JSON.stringify(tokens));
     } catch (error) {
@@ -131,7 +200,7 @@ class AuthAPI {
 
   clearStoredTokens(): void {
     if (typeof window === 'undefined') return;
-    
+
     try {
       localStorage.removeItem('auth_tokens');
       localStorage.removeItem('auth_user');
@@ -142,23 +211,41 @@ class AuthAPI {
 
   getStoredUser(): User | null {
     if (typeof window === 'undefined') return null;
-    
+
     try {
       const stored = localStorage.getItem('auth_user');
-      return stored ? JSON.parse(stored) : null;
+      if (!stored || stored === 'undefined' || stored === 'null') {
+        return null;
+      }
+      return JSON.parse(stored);
     } catch (error) {
       console.warn('Failed to parse stored user:', error);
+      // Clear corrupted data
+      localStorage.removeItem('auth_user');
       return null;
     }
   }
 
   setStoredUser(user: User): void {
     if (typeof window === 'undefined') return;
-    
+
     try {
       localStorage.setItem('auth_user', JSON.stringify(user));
     } catch (error) {
       console.warn('Failed to store user:', error);
+    }
+  }
+
+  async checkEmailAvailability(email: string): Promise<{ available: boolean; message: string }> {
+    try {
+      const response = await this.api.post('/check-email', { email });
+      return response.data;
+    } catch (error: any) {
+      console.warn('Failed to check email availability:', error);
+      return {
+        available: true,
+        message: 'Unable to check email availability'
+      };
     }
   }
 }

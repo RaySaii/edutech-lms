@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, UnauthorizedException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, UnauthorizedException, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, Organization } from '@edutech-lms/database';
@@ -6,29 +6,47 @@ import { AuthService as SharedAuthService } from '@edutech-lms/auth';
 import { UserService } from '../user/user.service';
 import { OrganizationService } from '../organization/organization.service';
 import { UserRole, UserStatus } from '@edutech-lms/common';
+import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
+import * as speakeasy from 'speakeasy';
+import * as crypto from 'crypto';
+import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto, Enable2FADto } from './dto';
+import { AuthResponse, UserProfile, TwoFactorSetupResponse } from './interfaces/auth-response.interface';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+  private readonly resetTokenCache = new Map<string, { userId: string; expires: Date }>();
+  private readonly emailVerificationCache = new Map<string, { userId: string; expires: Date }>();
+
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
     private sharedAuthService: SharedAuthService,
     private userService: UserService,
     private organizationService: OrganizationService,
-  ) {}
+    private configService: ConfigService,
+  ) {
+    // Clean expired tokens every hour
+    setInterval(() => this.cleanExpiredTokens(), 3600000);
+  }
 
-  async register(registerData: any) {
-    const { email, password, firstName, lastName, organizationSlug, phone } = registerData;
+  async register(registerDto: RegisterDto): Promise<AuthResponse> {
+    const { email, password, firstName, lastName, organizationSlug, phone, role } = registerDto;
+
+    this.logger.log(`Registration attempt for email: ${email}`);
 
     // Check if user already exists
-    const existingUser = await this.userRepository.findOne({ where: { email } });
+    const existingUser = await this.userRepository.findOne({
+      where: { email: email.toLowerCase() }
+    });
     if (existingUser) {
+      this.logger.warn(`Registration failed: Email ${email} already exists`);
       throw new ConflictException('User with this email already exists');
     }
 
     let organization: Organization;
-    
+
     if (organizationSlug) {
       // Find existing organization
       organization = await this.organizationService.findBySlug(organizationSlug);
@@ -51,39 +69,143 @@ export class AuthService {
 
     // Create user
     const user = this.userRepository.create({
-      email,
+      email: email.toLowerCase(),
       password: hashedPassword,
-      firstName,
-      lastName,
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
       phone,
       organizationId: organization.id,
-      role: organizationSlug ? UserRole.STUDENT : UserRole.ADMIN,
+      role: role || (organizationSlug ? UserRole.STUDENT : UserRole.ADMIN),
       status: UserStatus.PENDING_VERIFICATION,
     });
 
     const savedUser = await this.userRepository.save(user);
 
-    // Generate tokens
-    const tokens = await this.sharedAuthService.generateTokens(savedUser);
+    // Generate email verification token
+    const emailVerificationToken = this.generateSecureToken();
+    this.emailVerificationCache.set(emailVerificationToken, {
+      userId: savedUser.id,
+      expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+    });
 
-    return {
-      success: true,
-      message: 'User registered successfully',
-      data: {
-        user: {
-          id: savedUser.id,
-          email: savedUser.email,
-          firstName: savedUser.firstName,
-          lastName: savedUser.lastName,
-          role: savedUser.role,
-          organizationId: savedUser.organizationId,
-        },
+    this.logger.log(`User registered successfully: ${savedUser.email}`);
+
+    // Generate tokens only if email verification is not required
+    const requireEmailVerification = this.configService.get<boolean>('REQUIRE_EMAIL_VERIFICATION', true);
+
+    if (!requireEmailVerification) {
+      const tokens = await this.sharedAuthService.generateTokens(savedUser);
+      return {
+        user: this.sanitizeUser(savedUser),
         tokens,
-      },
+      };
+    }
+
+    // TODO: Send email verification email here
+    // await this.emailService.sendVerificationEmail(savedUser.email, emailVerificationToken);
+
+    // Return 202 Accepted - registration successful but requires email verification
+    return {
+      user: this.sanitizeUser(savedUser),
+      tokens: null,
+      requiresEmailVerification: true,
     };
   }
 
-  async login(user: any) {
+  async login(loginDto: LoginDto): Promise<AuthResponse> {
+    const { email, password, twoFactorCode } = loginDto;
+
+    this.logger.log(`Login attempt for email: ${email}`);
+
+    try {
+      // First check if user exists
+      let userExists;
+      try {
+        userExists = await this.userRepository.findOne({
+          where: { email: email.toLowerCase() },
+        });
+      } catch (dbError) {
+        this.logger.error(`Database error during user lookup for ${email}:`, dbError.message);
+        return {
+          success: false,
+          message: 'Database connection error',
+          statusCode: 500,
+          error: 'DATABASE_ERROR'
+        };
+      }
+
+      if (!userExists) {
+        this.logger.warn(`Login failed: User not found for ${email}`);
+        return {
+          success: false,
+          message: 'Invalid credentials',
+          statusCode: 401,
+          error: 'INVALID_CREDENTIALS'
+        };
+      }
+
+      const user = await this.validateUser(email, password);
+      if (!user) {
+        // Check if it's a status issue or invalid password
+        const userForStatusCheck = await this.userRepository.findOne({
+          where: { email: email.toLowerCase() }
+        });
+
+        if (userForStatusCheck) {
+          if (userForStatusCheck.status === UserStatus.SUSPENDED) {
+            this.logger.warn(`Login failed: Account suspended for ${email}`);
+            return {
+              success: false,
+              message: 'Account suspended',
+              statusCode: 403,
+              error: 'ACCOUNT_SUSPENDED'
+            };
+          }
+
+          if (userForStatusCheck.status === UserStatus.INACTIVE) {
+            this.logger.warn(`Login failed: Account deactivated for ${email}`);
+            return {
+              success: false,
+              message: 'Account deactivated',
+              statusCode: 403,
+              error: 'ACCOUNT_DEACTIVATED'
+            };
+          }
+        }
+
+        this.logger.warn(`Login failed: Invalid password for ${email}`);
+        return {
+          success: false,
+          message: 'Invalid credentials',
+          statusCode: 401,
+          error: 'UNAUTHORIZED'
+        };
+      }
+
+    // Check if 2FA is enabled
+    if (user.twoFactorEnabled) {
+      if (!twoFactorCode) {
+        return {
+          success: false,
+          message: 'Two-factor authentication code required',
+          statusCode: 400,
+          error: 'TWO_FACTOR_REQUIRED',
+          requiresTwoFactor: true,
+        };
+      }
+
+      const isValidTwoFactor = this.verifyTwoFactorCode(user.totpSecret, twoFactorCode);
+      if (!isValidTwoFactor) {
+        this.logger.warn(`Login failed: Invalid 2FA code for ${email}`);
+        return {
+          success: false,
+          message: 'Invalid two-factor authentication code',
+          statusCode: 401,
+          error: 'INVALID_TWO_FACTOR'
+        };
+      }
+    }
+
     // Generate tokens
     const tokens = await this.sharedAuthService.generateTokens(user);
 
@@ -92,26 +214,31 @@ export class AuthService {
       lastLoginAt: new Date(),
     });
 
-    return {
-      success: true,
-      message: 'Login successful',
-      data: {
-        user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
-          organizationId: user.organizationId,
-        },
-        tokens,
-      },
-    };
+      this.logger.log(`Login successful for user: ${user.email}`);
+
+      return {
+        success: true,
+        data: {
+          user: this.sanitizeUser(user),
+          tokens,
+        }
+      };
+    } catch (error) {
+      this.logger.error(`Login error for user: ${email}`, error.message);
+
+      // Return error response instead of throwing
+      return {
+        success: false,
+        message: 'Login failed',
+        statusCode: 500,
+        error: 'INTERNAL_ERROR'
+      };
+    }
   }
 
-  async validateUser(email: string, password: string): Promise<any> {
+  async validateUser(email: string, password: string): Promise<User | null> {
     const user = await this.userRepository.findOne({
-      where: { email },
+      where: { email: email.toLowerCase() },
       relations: ['organization'],
     });
 
@@ -120,7 +247,11 @@ export class AuthService {
     }
 
     if (user.status === UserStatus.SUSPENDED) {
-      throw new UnauthorizedException('Account suspended');
+      return null; // Let login method handle the error response
+    }
+
+    if (user.status === UserStatus.INACTIVE) {
+      return null; // Let login method handle the error response
     }
 
     const isPasswordValid = await this.sharedAuthService.comparePassword(password, user.password);
@@ -128,75 +259,395 @@ export class AuthService {
       return null;
     }
 
-    const { password: _, ...result } = user;
-    return result;
+    return user;
   }
 
-  async refresh(refreshToken: string) {
+  async refresh(refreshToken: string): Promise<AuthResponse> {
     try {
+      this.logger.log('Token refresh attempt');
+
       const payload = await this.sharedAuthService.verifyRefreshToken(refreshToken);
-      const user = await this.userRepository.findOne({ where: { id: payload.sub } });
-      
+      const user = await this.userRepository.findOne({
+        where: { id: payload.sub },
+        relations: ['organization']
+      });
+
       if (!user) {
+        this.logger.warn('Token refresh failed: User not found');
         throw new UnauthorizedException('Invalid refresh token');
       }
 
+      if (user.status === UserStatus.SUSPENDED || user.status === UserStatus.INACTIVE) {
+        this.logger.warn(`Token refresh failed: User ${user.email} account suspended/inactive`);
+        throw new UnauthorizedException('Account suspended or inactive');
+      }
+
       const tokens = await this.sharedAuthService.generateTokens(user);
-      
+
+      this.logger.log(`Token refreshed successfully for user: ${user.email}`);
+
       return {
         success: true,
         message: 'Token refreshed successfully',
-        data: { tokens },
+        data: {
+          user: this.sanitizeUser(user),
+          tokens
+        },
       };
     } catch (error) {
+      this.logger.error('Token refresh failed:', error.message);
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
 
-  async logout(userId: string) {
-    // In a real implementation, you might want to blacklist the token
-    // For now, we'll just return success
+  async logout(userId: string): Promise<AuthResponse> {
+    this.logger.log(`Logout request for user: ${userId}`);
+
+    // TODO: Implement token blacklisting in Redis
+    // await this.redisService.blacklistToken(token);
+
     return {
       success: true,
       message: 'Logged out successfully',
     };
   }
 
-  async forgotPassword(email: string) {
-    const user = await this.userRepository.findOne({ where: { email } });
-    if (!user) {
-      // Don't reveal if email exists or not
-      return {
-        success: true,
-        message: 'If the email exists, a password reset link has been sent',
-      };
+  async forgotPassword(forgotPasswordDto: ForgotPasswordDto): Promise<AuthResponse> {
+    const { email } = forgotPasswordDto;
+
+    this.logger.log(`Password reset request for email: ${email}`);
+
+    const user = await this.userRepository.findOne({
+      where: { email: email.toLowerCase() }
+    });
+
+    // Always return success to prevent user enumeration
+    const response = {
+      success: true,
+      message: 'If the email exists, a password reset link has been sent',
+    };
+
+    if (user) {
+      const resetToken = this.generateSecureToken();
+
+      // Store reset token with expiration (15 minutes)
+      this.resetTokenCache.set(resetToken, {
+        userId: user.id,
+        expires: new Date(Date.now() + 15 * 60 * 1000),
+      });
+
+      // TODO: Send password reset email
+      // await this.emailService.sendPasswordResetEmail(user.email, resetToken);
+
+      this.logger.log(`Password reset token generated for user: ${user.email}`);
     }
 
-    // Generate reset token (simplified - in production use a proper token)
-    const resetToken = uuidv4();
-    
-    // In a real implementation, store this token with expiration in database
-    // and send email with reset link
-    
-    return {
-      success: true,
-      message: 'Password reset email sent',
-      data: { resetToken }, // Only for development
-    };
+    return response;
   }
 
-  async resetPassword(token: string, newPassword: string) {
-    // In a real implementation, validate the token from database
-    // For now, we'll assume token is valid
-    
-    const hashedPassword = await this.sharedAuthService.hashPassword(newPassword);
-    
-    // This is simplified - in production, find user by valid reset token
-    // await this.userRepository.update({ resetToken: token }, { password: hashedPassword });
-    
+  async resetPassword(resetPasswordDto: ResetPasswordDto): Promise<AuthResponse> {
+    const { token, password } = resetPasswordDto;
+
+    this.logger.log(`Password reset attempt with token: ${token.substring(0, 8)}...`);
+
+    const tokenData = this.resetTokenCache.get(token);
+    if (!tokenData || tokenData.expires < new Date()) {
+      this.logger.warn(`Invalid or expired reset token: ${token.substring(0, 8)}...`);
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+
+    const user = await this.userRepository.findOne({
+      where: { id: tokenData.userId }
+    });
+
+    if (!user) {
+      this.logger.error(`User not found for reset token: ${token.substring(0, 8)}...`);
+      throw new NotFoundException('User not found');
+    }
+
+    const hashedPassword = await this.sharedAuthService.hashPassword(password);
+
+    await this.userRepository.update(user.id, {
+      password: hashedPassword,
+    });
+
+    // Remove used token
+    this.resetTokenCache.delete(token);
+
+    this.logger.log(`Password reset successful for user: ${user.email}`);
+
     return {
       success: true,
       message: 'Password reset successfully',
     };
+  }
+
+  async changePassword(userId: string, changePasswordDto: ChangePasswordDto): Promise<AuthResponse> {
+    const { currentPassword, newPassword } = changePasswordDto;
+
+    this.logger.log(`Password change request for user: ${userId}`);
+
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const isCurrentPasswordValid = await this.sharedAuthService.comparePassword(currentPassword, user.password);
+    if (!isCurrentPasswordValid) {
+      this.logger.warn(`Password change failed: Invalid current password for user ${userId}`);
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    const hashedNewPassword = await this.sharedAuthService.hashPassword(newPassword);
+
+    await this.userRepository.update(userId, {
+      password: hashedNewPassword,
+    });
+
+    this.logger.log(`Password changed successfully for user: ${userId}`);
+
+    return {
+      success: true,
+      message: 'Password changed successfully',
+    };
+  }
+
+  async verifyEmail(token: string): Promise<AuthResponse> {
+    this.logger.log(`Email verification attempt with token: ${token.substring(0, 8)}...`);
+
+    const tokenData = this.emailVerificationCache.get(token);
+    if (!tokenData || tokenData.expires < new Date()) {
+      this.logger.warn(`Invalid or expired verification token: ${token.substring(0, 8)}...`);
+      throw new BadRequestException('Invalid or expired verification token');
+    }
+
+    const user = await this.userRepository.findOne({
+      where: { id: tokenData.userId }
+    });
+
+    if (!user) {
+      this.logger.error(`User not found for verification token: ${token.substring(0, 8)}...`);
+      throw new NotFoundException('User not found');
+    }
+
+    await this.userRepository.update(user.id, {
+      emailVerifiedAt: new Date(),
+      status: UserStatus.ACTIVE,
+    });
+
+    // Remove used token
+    this.emailVerificationCache.delete(token);
+
+    this.logger.log(`Email verified successfully for user: ${user.email}`);
+
+    const tokens = await this.sharedAuthService.generateTokens(user);
+
+    return {
+      success: true,
+      message: 'Email verified successfully',
+      data: {
+        user: this.sanitizeUser({ ...user, emailVerifiedAt: new Date(), status: UserStatus.ACTIVE }),
+        tokens,
+      },
+    };
+  }
+
+  async setupTwoFactor(userId: string): Promise<TwoFactorSetupResponse> {
+    this.logger.log(`2FA setup request for user: ${userId}`);
+
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.twoFactorEnabled) {
+      throw new BadRequestException('Two-factor authentication is already enabled');
+    }
+
+    const secret = speakeasy.generateSecret({
+      name: `EduTech LMS (${user.email})`,
+      issuer: 'EduTech LMS',
+      length: 32,
+    });
+
+    const qrCodeUrl = `otpauth://totp/EduTech%20LMS:${encodeURIComponent(user.email)}?secret=${secret.base32}&issuer=EduTech%20LMS`;
+
+    // Generate backup codes
+    const backupCodes = this.generateBackupCodes();
+
+    // Store the secret temporarily (user needs to verify before enabling)
+    await this.userRepository.update(userId, {
+      totpSecret: secret.base32,
+      backupCodes,
+    });
+
+    this.logger.log(`2FA setup initiated for user: ${user.email}`);
+
+    return {
+      success: true,
+      message: '2FA setup initiated. Please verify the code to enable.',
+      data: {
+        qrCodeUrl,
+        secret: secret.base32,
+        backupCodes,
+      },
+    };
+  }
+
+  async enableTwoFactor(userId: string, enable2FADto: Enable2FADto): Promise<AuthResponse> {
+    const { code } = enable2FADto;
+
+    this.logger.log(`2FA enable request for user: ${userId}`);
+
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (!user.totpSecret) {
+      throw new BadRequestException('Two-factor authentication setup not initiated');
+    }
+
+    const isValidCode = this.verifyTwoFactorCode(user.totpSecret, code);
+    if (!isValidCode) {
+      this.logger.warn(`2FA enable failed: Invalid code for user ${userId}`);
+      throw new BadRequestException('Invalid verification code');
+    }
+
+    await this.userRepository.update(userId, {
+      twoFactorEnabled: true,
+    });
+
+    this.logger.log(`2FA enabled successfully for user: ${user.email}`);
+
+    return {
+      success: true,
+      message: 'Two-factor authentication enabled successfully',
+      data: {
+        user: this.sanitizeUser({ ...user, twoFactorEnabled: true }),
+        tokens: null,
+      },
+      backupCodes: user.backupCodes,
+    };
+  }
+
+  async disableTwoFactor(userId: string, currentPassword: string): Promise<AuthResponse> {
+    this.logger.log(`2FA disable request for user: ${userId}`);
+
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const isPasswordValid = await this.sharedAuthService.comparePassword(currentPassword, user.password);
+    if (!isPasswordValid) {
+      this.logger.warn(`2FA disable failed: Invalid password for user ${userId}`);
+      throw new UnauthorizedException('Invalid password');
+    }
+
+    await this.userRepository.update(userId, {
+      twoFactorEnabled: false,
+      totpSecret: null,
+      backupCodes: null,
+    });
+
+    this.logger.log(`2FA disabled successfully for user: ${user.email}`);
+
+    return {
+      success: true,
+      message: 'Two-factor authentication disabled successfully',
+    };
+  }
+
+  async getUserProfile(userId: string): Promise<UserProfile> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['organization'],
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return this.sanitizeUser(user);
+  }
+
+  async checkEmailAvailability(email: string): Promise<{ available: boolean; message: string }> {
+    this.logger.log(`Email availability check for: ${email}`);
+
+    const existingUser = await this.userRepository.findOne({
+      where: { email: email.toLowerCase() }
+    });
+
+    if (existingUser) {
+      return {
+        available: false,
+        message: 'Email is already registered'
+      };
+    }
+
+    return {
+      available: true,
+      message: 'Email is available'
+    };
+  }
+
+  // Utility methods
+  private sanitizeUser(user: User): UserProfile {
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+      status: user.status,
+      organizationId: user.organizationId,
+      emailVerifiedAt: user.emailVerifiedAt,
+      lastLoginAt: user.lastLoginAt,
+      twoFactorEnabled: user.twoFactorEnabled,
+      avatar: user.avatar,
+      phone: user.phone,
+    };
+  }
+
+  private generateSecureToken(): string {
+    return crypto.randomBytes(32).toString('hex');
+  }
+
+  private generateBackupCodes(): string[] {
+    const codes = [];
+    for (let i = 0; i < 10; i++) {
+      codes.push(crypto.randomBytes(4).toString('hex').toUpperCase());
+    }
+    return codes;
+  }
+
+  private verifyTwoFactorCode(secret: string, code: string): boolean {
+    return speakeasy.totp.verify({
+      secret,
+      encoding: 'base32',
+      token: code,
+      window: 2, // Allow 2 time steps forward/backward
+    });
+  }
+
+  private cleanExpiredTokens(): void {
+    const now = new Date();
+
+    // Clean reset tokens
+    for (const [token, data] of this.resetTokenCache.entries()) {
+      if (data.expires < now) {
+        this.resetTokenCache.delete(token);
+      }
+    }
+
+    // Clean email verification tokens
+    for (const [token, data] of this.emailVerificationCache.entries()) {
+      if (data.expires < now) {
+        this.emailVerificationCache.delete(token);
+      }
+    }
+
+    this.logger.debug('Expired tokens cleaned up');
   }
 }
