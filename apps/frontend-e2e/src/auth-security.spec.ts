@@ -101,9 +101,9 @@ test.describe('Authentication Security Best Practices E2E Tests', () => {
         console.log('✓ Email shows as unavailable (red border)');
         
         // Look for guidance text
-        const guidanceText = page.locator('text=Already have an account?');
-        const signInLink = page.locator('text=Sign in');
-        const forgotPasswordLink = page.locator('text=forgot password?');
+        const guidanceText = page.locator('text=Already have an account?').first();
+        const signInLink = page.locator('text=Sign in').first();
+        const forgotPasswordLink = page.locator('text=forgot password?').first();
         
         if (await guidanceText.isVisible()) {
           console.log('✓ Guidance text displayed for existing email');
@@ -354,8 +354,8 @@ test.describe('Authentication Security Best Practices E2E Tests', () => {
       await page.waitForTimeout(600);
       
       // Should provide clear next steps
-      const signInLink = page.locator('text=Sign in');
-      const forgotPasswordLink = page.locator('text=forgot password');
+      const signInLink = page.locator('text=Sign in').first();
+      const forgotPasswordLink = page.locator('text=forgot password').first();
       
       expect(await signInLink.isVisible() || await forgotPasswordLink.isVisible()).toBe(true);
       console.log('✓ Clear next steps provided in registration');
