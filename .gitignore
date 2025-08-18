@@ -49,3 +49,4 @@ vitest.config.*.timestamp*
 
 .claude
 CLAUDE.md
+notify-completion.sh

@@ -31,6 +31,73 @@ describe('RegisterForm - Security Best Practices', () => {
   });
 
   describe('Email Availability Security Features', () => {
+    test('shows loading indicator while checking email availability', async () => {
+      // Mock API to return a delayed response
+      mockAuthAPI.checkEmailAvailability.mockImplementation(() => 
+        new Promise(resolve => 
+          setTimeout(() => resolve({
+            available: true,
+            message: 'Email is available'
+          }), 100)
+        )
+      );
+
+      render(<RegisterForm onLoginClick={mockOnLoginClick} />);
+
+      const emailInput = screen.getByTestId('email-input');
+      fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
+
+      // Should show loading spinner immediately
+      await waitFor(() => {
+        expect(screen.getByTestId('email-loading')).toBeInTheDocument();
+      });
+
+      // Should have spinning animation
+      const loadingSpinner = screen.getByTestId('email-loading');
+      expect(loadingSpinner).toHaveClass('animate-spin');
+
+      // After API call completes, loading should disappear
+      await waitFor(() => {
+        expect(screen.queryByTestId('email-loading')).not.toBeInTheDocument();
+      });
+
+      // Should show availability result
+      expect(screen.getByText('Email is available')).toBeInTheDocument();
+    });
+
+    test('shows visual status indicators after email check completes', async () => {
+      // Test available email
+      mockAuthAPI.checkEmailAvailability.mockResolvedValue({
+        available: true,
+        message: 'Email is available'
+      });
+
+      const { rerender } = render(<RegisterForm onLoginClick={mockOnLoginClick} />);
+
+      const emailInput = screen.getByTestId('email-input');
+      fireEvent.change(emailInput, { target: { value: 'available@example.com' } });
+
+      await waitFor(() => {
+        // Should show green indicator for available email
+        const indicator = screen.getByTestId('email-input').parentElement?.querySelector('.bg-green-100');
+        expect(indicator).toBeInTheDocument();
+      });
+
+      // Test unavailable email
+      mockAuthAPI.checkEmailAvailability.mockResolvedValue({
+        available: false,
+        message: 'Email is already registered'
+      });
+
+      fireEvent.change(emailInput, { target: { value: 'taken@example.com' } });
+
+      await waitFor(() => {
+        // Should show red indicator for unavailable email
+        const indicator = screen.getByTestId('email-input').parentElement?.querySelector('.bg-red-100');
+        expect(indicator).toBeInTheDocument();
+      });
+    });
+
     test('shows guidance for existing email without exposing user details', async () => {
       // Mock API to return email unavailable
       mockAuthAPI.checkEmailAvailability.mockResolvedValue({

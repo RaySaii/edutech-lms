@@ -248,8 +248,18 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
                 data-testid="email-input"
               />
               <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                {formData.email ? (
-                  <Loader2 className="h-4 w-4 text-gray-400 animate-spin" />
+                {emailStatus.checking ? (
+                  <Loader2 className="h-4 w-4 text-gray-400 animate-spin" data-testid="email-loading" />
+                ) : formData.email && emailStatus.available !== undefined ? (
+                  emailStatus.available ? (
+                    <div className="h-4 w-4 rounded-full bg-green-100 flex items-center justify-center">
+                      <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                    </div>
+                  ) : (
+                    <div className="h-4 w-4 rounded-full bg-red-100 flex items-center justify-center">
+                      <div className="h-2 w-2 rounded-full bg-red-500"></div>
+                    </div>
+                  )
                 ) : null}
               </div>
             </div>
