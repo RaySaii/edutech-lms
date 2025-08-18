@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { AuthProvider } from '../contexts/AuthContext'
 import { GlobalAuthGuard } from '../components/auth/GlobalAuthGuard'
-import { ToastProvider } from '../components/ui/toast'
+import ClientOnlyToastProvider from '../components/ui/ClientOnlyToastProvider'
 
 export const metadata: Metadata = {
   title: 'EduTech LMS',
@@ -16,14 +16,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
-        <ToastProvider>
+      <body suppressHydrationWarning={true}>
+        <ClientOnlyToastProvider>
           <AuthProvider>
             <GlobalAuthGuard>
               {children}
             </GlobalAuthGuard>
           </AuthProvider>
-        </ToastProvider>
+        </ClientOnlyToastProvider>
       </body>
     </html>
   )
