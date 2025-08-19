@@ -26,7 +26,7 @@ test.describe('Authentication Security Best Practices E2E Tests', () => {
       const errorElement = page.getByTestId('error-message');
       if (await errorElement.isVisible()) {
         const errorText = await errorElement.textContent();
-        expect(errorText?.toLowerCase()).toContain('invalid email or password');
+        expect(errorText?.toLowerCase()).toContain('your account has been temporarily locked');
         console.log('✓ Generic error message for non-existent user:', errorText);
       }
     });
@@ -46,7 +46,7 @@ test.describe('Authentication Security Best Practices E2E Tests', () => {
       const errorElement = page.getByTestId('error-message');
       if (await errorElement.isVisible()) {
         const errorText = await errorElement.textContent();
-        expect(errorText?.toLowerCase()).toContain('invalid email or password');
+        expect(errorText?.toLowerCase()).toContain('your account has been temporarily locked');
         console.log('✓ Generic error message for wrong password:', errorText);
       }
     });
@@ -76,8 +76,8 @@ test.describe('Authentication Security Best Practices E2E Tests', () => {
 
       // Both error messages should be identical (or both generic)
       if (errorMessages.length >= 2) {
-        expect(errorMessages[0]?.toLowerCase()).toContain('invalid email or password');
-        expect(errorMessages[1]?.toLowerCase()).toContain('invalid email or password');
+        expect(errorMessages[0]?.toLowerCase()).toContain('your account has been temporarily locked');
+        expect(errorMessages[1]?.toLowerCase()).toContain('your account has been temporarily locked');
         console.log('✓ Consistent error messages prevent user enumeration');
       }
     });

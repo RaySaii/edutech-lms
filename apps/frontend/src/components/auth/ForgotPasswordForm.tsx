@@ -95,6 +95,7 @@ export function ForgotPasswordForm({ onBackClick, onSuccess }: ForgotPasswordFor
               type="button"
               onClick={onBackClick}
               className="w-full flex items-center justify-center py-2.5 px-4 text-sm font-medium text-blue-600 hover:text-blue-500 transition-colors duration-200"
+              data-testid="back-to-login"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Sign In
@@ -186,7 +187,7 @@ export function ForgotPasswordForm({ onBackClick, onSuccess }: ForgotPasswordFor
             type="button"
             onClick={onBackClick}
             className="w-full flex items-center justify-center py-2.5 px-4 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors duration-200"
-            data-testid="back-button"
+            data-testid="back-to-login"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Sign In

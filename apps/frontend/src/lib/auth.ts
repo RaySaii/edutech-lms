@@ -155,8 +155,8 @@ class AuthAPI {
     return response.data;
   }
 
-  async resetPassword(token: string, password: string): Promise<{ success: boolean; message: string }> {
-    const response = await this.api.post('/reset-password', { token, password });
+  async resetPassword(data: { token: string; password: string }): Promise<{ success: boolean; message: string }> {
+    const response = await this.api.post('/reset-password', data);
     return response.data;
   }
 

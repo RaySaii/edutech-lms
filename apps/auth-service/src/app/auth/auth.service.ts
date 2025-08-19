@@ -1,6 +1,7 @@
-import { Injectable, ConflictException, UnauthorizedException, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, ConflictException, UnauthorizedException, NotFoundException, BadRequestException, Logger, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { ClientProxy } from '@nestjs/microservices';
 import { User, Organization } from '@edutech-lms/database';
 import { AuthService as SharedAuthService } from '@edutech-lms/auth';
 import { UserService } from '../user/user.service';
@@ -26,6 +27,7 @@ export class AuthService {
     private userService: UserService,
     private organizationService: OrganizationService,
     private configService: ConfigService,
+    @Inject('NOTIFICATION_SERVICE') private notificationClient: ClientProxy,
   ) {
     // Clean expired tokens every hour
     setInterval(() => this.cleanExpiredTokens(), 3600000);
@@ -138,7 +140,7 @@ export class AuthService {
         this.logger.warn(`Login failed: User not found for ${email}`);
         return {
           success: false,
-          message: 'Invalid credentials',
+          message: 'Invalid email or password. Please try again.',
           statusCode: 401,
           error: 'INVALID_CREDENTIALS'
         };
@@ -156,7 +158,7 @@ export class AuthService {
             this.logger.warn(`Login failed: Account suspended for ${email}`);
             return {
               success: false,
-              message: 'Account suspended',
+              message: 'Your account has been suspended. Please contact support.',
               statusCode: 403,
               error: 'ACCOUNT_SUSPENDED'
             };
@@ -166,7 +168,7 @@ export class AuthService {
             this.logger.warn(`Login failed: Account deactivated for ${email}`);
             return {
               success: false,
-              message: 'Account deactivated',
+              message: 'Your account has been deactivated. Please contact support.',
               statusCode: 403,
               error: 'ACCOUNT_DEACTIVATED'
             };
@@ -176,7 +178,7 @@ export class AuthService {
         this.logger.warn(`Login failed: Invalid password for ${email}`);
         return {
           success: false,
-          message: 'Invalid credentials',
+          message: 'Invalid email or password. Please try again.',
           statusCode: 401,
           error: 'UNAUTHORIZED'
         };
@@ -336,8 +338,8 @@ export class AuthService {
         expires: new Date(Date.now() + 15 * 60 * 1000),
       });
 
-      // TODO: Send password reset email
-      // await this.emailService.sendPasswordResetEmail(user.email, resetToken);
+      // Send password reset email
+      await this.sendPasswordResetEmail(user.email, resetToken);
 
       this.logger.log(`Password reset token generated for user: ${user.email}`);
     }
@@ -649,5 +651,54 @@ export class AuthService {
     }
 
     this.logger.debug('Expired tokens cleaned up');
+  }
+
+  private async sendPasswordResetEmail(email: string, resetToken: string): Promise<void> {
+    try {
+      const user = await this.userRepository.findOne({ where: { email: email.toLowerCase() } });
+      if (!user) {
+        this.logger.warn(`Cannot send password reset email: User not found for ${email}`);
+        return;
+      }
+
+      this.logger.log(`Sending password reset email directly for ${user.email}`);
+
+      // Direct email sending with nodemailer for now
+      const nodemailer = require('nodemailer');
+      
+      const transporter = nodemailer.createTransport({
+        host: 'localhost',
+        port: 1025,
+        secure: false,
+        auth: undefined,
+      });
+
+      const resetUrl = `${this.configService.get('FRONTEND_URL', 'http://localhost:3000')}/reset-password?token=${resetToken}`;
+      
+      const mailOptions = {
+        from: 'noreply@edutech-lms.com',
+        to: user.email,
+        subject: 'Reset Your Password - EduTech LMS',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333;">Password Reset Request</h2>
+            <p>Hi ${user.firstName},</p>
+            <p>You requested to reset your password. Click the button below to create a new password:</p>
+            <a href="${resetUrl}" style="background-color: #dc3545; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block; margin: 16px 0;">Reset Password</a>
+            <p>This link will expire in 15 minutes.</p>
+            <p>If you didn't request this password reset, please ignore this email.</p>
+            <p>Best regards,<br>The EduTech LMS Team</p>
+          </div>
+        `,
+        text: `Hi ${user.firstName}, Reset your password: ${resetUrl} (expires in 15 minutes)`
+      };
+
+      const result = await transporter.sendMail(mailOptions);
+      this.logger.log(`Password reset email sent successfully to ${user.email}, messageId: ${result.messageId}`);
+      
+    } catch (error) {
+      this.logger.error(`Failed to send password reset email to ${email}:`, error.message);
+      throw error;
+    }
   }
 }
