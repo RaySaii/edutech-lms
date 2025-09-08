@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, UnauthorizedException, NotFoundException, BadRequestException, Logger, Inject } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ClientProxy } from '@nestjs/microservices';
@@ -6,7 +6,14 @@ import { User, Organization } from '@edutech-lms/database';
 import { AuthService as SharedAuthService } from '@edutech-lms/auth';
 import { UserService } from '../user/user.service';
 import { OrganizationService } from '../organization/organization.service';
-import { UserRole, UserStatus } from '@edutech-lms/common';
+import { 
+  UserRole, 
+  UserStatus,
+  ResponseUtil,
+  ErrorUtil,
+  LoggerUtil,
+  ValidationUtil
+} from '@edutech-lms/common';
 import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
 import * as speakeasy from 'speakeasy';
@@ -16,7 +23,7 @@ import { AuthResponse, UserProfile, TwoFactorSetupResponse } from './interfaces/
 
 @Injectable()
 export class AuthService {
-  private readonly logger = new Logger(AuthService.name);
+  private readonly logger = LoggerUtil.createLogger(AuthService.name);
   private readonly resetTokenCache = new Map<string, { userId: string; expires: Date }>();
   private readonly emailVerificationCache = new Map<string, { userId: string; expires: Date }>();
 
@@ -36,28 +43,38 @@ export class AuthService {
   async register(registerDto: RegisterDto): Promise<AuthResponse> {
     const { email, password, firstName, lastName, organizationSlug, phone, role } = registerDto;
 
-    this.logger.log(`Registration attempt for email: ${email}`);
+    // Validate input
+    ValidationUtil.validateRequired(registerDto, ['email', 'password', 'firstName', 'lastName']);
+    ValidationUtil.validateEmail(email);
+    ValidationUtil.validatePassword(password);
+    ValidationUtil.validateStringLength(firstName, 'First name', 1, 50);
+    ValidationUtil.validateStringLength(lastName, 'Last name', 1, 50);
+    
+    if (phone) {
+      ValidationUtil.validatePhone(phone);
+    }
+
+    LoggerUtil.logWithData(this.logger, 'log', 'Registration attempt', { email, role: role || UserRole.STUDENT });
 
     // Check if user already exists
     const existingUser = await this.userRepository.findOne({
       where: { email: email.toLowerCase() }
     });
     if (existingUser) {
-      this.logger.warn(`Registration failed: Email ${email} already exists`);
-      throw new ConflictException('User with this email already exists');
+      LoggerUtil.logWithData(this.logger, 'warn', 'Registration failed - email exists', { email });
+      ErrorUtil.throwConflict('User with this email already exists');
     }
 
     let organization: Organization;
 
     if (organizationSlug) {
+      ValidationUtil.validateStringLength(organizationSlug, 'Organization slug', 2, 100);
       // Find existing organization
       organization = await this.organizationService.findBySlug(organizationSlug);
-      if (!organization) {
-        throw new NotFoundException('Organization not found');
-      }
+      ErrorUtil.checkExists(organization, 'Organization');
     } else {
       // Create new organization for the user
-      const orgName = `${firstName} ${lastName}'s Organization`;
+      const orgName = `${ValidationUtil.sanitizeString(firstName)} ${ValidationUtil.sanitizeString(lastName)}'s Organization`;
       const slug = `${firstName.toLowerCase()}-${lastName.toLowerCase()}-${Date.now()}`;
       organization = await this.organizationService.create({
         name: orgName,
@@ -69,28 +86,35 @@ export class AuthService {
     // Hash password
     const hashedPassword = await this.sharedAuthService.hashPassword(password);
 
-    // Create user
-    const user = this.userRepository.create({
-      email: email.toLowerCase(),
-      password: hashedPassword,
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      phone,
-      organizationId: organization.id,
-      role: role || (organizationSlug ? UserRole.STUDENT : UserRole.ADMIN),
-      status: UserStatus.PENDING_VERIFICATION,
-    });
+    // Create user - default to student for self-learning platform
+    try {
+      const user = this.userRepository.create({
+        email: email.toLowerCase(),
+        password: hashedPassword,
+        firstName: ValidationUtil.sanitizeString(firstName),
+        lastName: ValidationUtil.sanitizeString(lastName),
+        phone,
+        organizationId: organization.id,
+        role: role || UserRole.STUDENT,
+        status: UserStatus.PENDING_VERIFICATION,
+      });
 
-    const savedUser = await this.userRepository.save(user);
+      const savedUser = await this.userRepository.save(user);
+      LoggerUtil.logWithData(this.logger, 'log', 'User registered successfully', { userId: savedUser.id, email: savedUser.email });
+      
+      return await this.handleRegistrationSuccess(savedUser);
+    } catch (error) {
+      ErrorUtil.handleRepositoryError(error, 'User', this.logger);
+    }
+  }
 
-    // Generate email verification token
+  private async handleRegistrationSuccess(savedUser: User): Promise<AuthResponse> {
+
     const emailVerificationToken = this.generateSecureToken();
     this.emailVerificationCache.set(emailVerificationToken, {
       userId: savedUser.id,
       expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
     });
-
-    this.logger.log(`User registered successfully: ${savedUser.email}`);
 
     // Generate tokens only if email verification is not required
     const requireEmailVerification = this.configService.get<boolean>('REQUIRE_EMAIL_VERIFICATION', true);
@@ -103,8 +127,8 @@ export class AuthService {
       };
     }
 
-    // TODO: Send email verification email here
-    // await this.emailService.sendVerificationEmail(savedUser.email, emailVerificationToken);
+    // Send email verification email
+    await this.sendEmailVerificationEmail(savedUser.email, emailVerificationToken, savedUser.firstName);
 
     // Return 202 Accepted - registration successful but requires email verification
     return {
@@ -115,7 +139,7 @@ export class AuthService {
   }
 
   async login(loginDto: LoginDto): Promise<AuthResponse> {
-    const { email, password, twoFactorCode } = loginDto;
+    const { email, password, twoFactorCode, rememberMe } = loginDto;
 
     this.logger.log(`Login attempt for email: ${email}`);
 
@@ -173,6 +197,16 @@ export class AuthService {
               error: 'ACCOUNT_DEACTIVATED'
             };
           }
+
+          if (userForStatusCheck.status === UserStatus.PENDING_VERIFICATION) {
+            this.logger.warn(`Login failed: Account pending verification for ${email}`);
+            return {
+              success: false,
+              message: 'Please verify your email address before logging in. Check your inbox for the verification link.',
+              statusCode: 403,
+              error: 'EMAIL_VERIFICATION_REQUIRED'
+            };
+          }
         }
 
         this.logger.warn(`Login failed: Invalid password for ${email}`);
@@ -208,8 +242,8 @@ export class AuthService {
       }
     }
 
-    // Generate tokens
-    const tokens = await this.sharedAuthService.generateTokens(user);
+    // Generate tokens with rememberMe option
+    const tokens = await this.sharedAuthService.generateTokens(user, rememberMe);
 
     // Update last login
     await this.userRepository.update(user.id, {
@@ -231,7 +265,7 @@ export class AuthService {
       // Return error response instead of throwing
       return {
         success: false,
-        message: 'Login failed',
+        message: 'We\'re experiencing technical difficulties. Please try again in a moment.',
         statusCode: 500,
         error: 'INTERNAL_ERROR'
       };
@@ -253,6 +287,10 @@ export class AuthService {
     }
 
     if (user.status === UserStatus.INACTIVE) {
+      return null; // Let login method handle the error response
+    }
+
+    if (user.status === UserStatus.PENDING_VERIFICATION) {
       return null; // Let login method handle the error response
     }
 
@@ -284,9 +322,23 @@ export class AuthService {
         throw new UnauthorizedException('Account suspended or inactive');
       }
 
-      const tokens = await this.sharedAuthService.generateTokens(user);
+      // Determine if this was a "remember me" token by checking the original expiration time
+      // Compare the token's total lifetime against standard vs remember-me durations
+      const tokenExp = payload.exp * 1000; // Convert to milliseconds
+      const tokenIat = payload.iat * 1000; // Convert to milliseconds
+      const tokenLifetime = tokenExp - tokenIat;
+      
+      // Standard refresh token lifetime is 7 days (604800000ms)
+      // Remember me refresh token lifetime is 30 days (2592000000ms)
+      const standardLifetime = 7 * 24 * 60 * 60 * 1000;
+      const rememberMeLifetime = 30 * 24 * 60 * 60 * 1000;
+      
+      // If the token lifetime is closer to remember me duration, treat as remember me
+      const rememberMe = Math.abs(tokenLifetime - rememberMeLifetime) < Math.abs(tokenLifetime - standardLifetime);
 
-      this.logger.log(`Token refreshed successfully for user: ${user.email}`);
+      const tokens = await this.sharedAuthService.generateTokens(user, rememberMe);
+
+      this.logger.log(`Token refreshed successfully for user: ${user.email} (rememberMe: ${rememberMe})`);
 
       return {
         success: true,
@@ -387,31 +439,29 @@ export class AuthService {
   async changePassword(userId: string, changePasswordDto: ChangePasswordDto): Promise<AuthResponse> {
     const { currentPassword, newPassword } = changePasswordDto;
 
-    this.logger.log(`Password change request for user: ${userId}`);
+    ValidationUtil.validateUUID(userId, 'User ID');
+    ValidationUtil.validateRequired(changePasswordDto, ['currentPassword', 'newPassword']);
+    ValidationUtil.validatePassword(newPassword);
+
+    LoggerUtil.logWithData(this.logger, 'log', 'Password change request', { userId });
 
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
+    ErrorUtil.checkExists(user, 'User', userId);
 
     const isCurrentPasswordValid = await this.sharedAuthService.comparePassword(currentPassword, user.password);
     if (!isCurrentPasswordValid) {
-      this.logger.warn(`Password change failed: Invalid current password for user ${userId}`);
-      throw new UnauthorizedException('Current password is incorrect');
+      LoggerUtil.logWithData(this.logger, 'warn', 'Password change failed - invalid current password', { userId });
+      ErrorUtil.throwUnauthorized('Current password is incorrect');
     }
 
-    const hashedNewPassword = await this.sharedAuthService.hashPassword(newPassword);
-
-    await this.userRepository.update(userId, {
-      password: hashedNewPassword,
-    });
-
-    this.logger.log(`Password changed successfully for user: ${userId}`);
-
-    return {
-      success: true,
-      message: 'Password changed successfully',
-    };
+    try {
+      const hashedNewPassword = await this.sharedAuthService.hashPassword(newPassword);
+      await this.userRepository.update(userId, { password: hashedNewPassword });
+      LoggerUtil.logWithData(this.logger, 'log', 'Password changed successfully', { userId });
+      return ResponseUtil.success(null, 'Password changed successfully');
+    } catch (error) {
+      ErrorUtil.handleRepositoryError(error, 'User', this.logger);
+    }
   }
 
   async verifyEmail(token: string): Promise<AuthResponse> {
@@ -562,15 +612,14 @@ export class AuthService {
   }
 
   async getUserProfile(userId: string): Promise<UserProfile> {
+    ValidationUtil.validateUUID(userId, 'User ID');
+    
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: ['organization'],
     });
 
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
+    ErrorUtil.checkExists(user, 'User', userId);
     return this.sanitizeUser(user);
   }
 
@@ -651,6 +700,54 @@ export class AuthService {
     }
 
     this.logger.debug('Expired tokens cleaned up');
+  }
+
+  private async sendEmailVerificationEmail(email: string, verificationToken: string, firstName: string): Promise<void> {
+    try {
+      this.logger.log(`Sending email verification email to ${email}`);
+
+      // Direct email sending with nodemailer for development
+      const nodemailer = require('nodemailer');
+      
+      const transporter = nodemailer.createTransport({
+        host: 'localhost',
+        port: 1025, // MailHog SMTP port
+        secure: false,
+        auth: undefined,
+      });
+
+      const verificationUrl = `${this.configService.get('FRONTEND_URL', 'http://localhost:4200')}/verify-email?token=${verificationToken}`;
+      
+      const mailOptions = {
+        from: 'noreply@edutech-lms.com',
+        to: email,
+        subject: 'Verify Your Email - EduTech LMS',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333;">Welcome to EduTech LMS!</h2>
+            <p>Hi ${firstName},</p>
+            <p>Thank you for registering with EduTech LMS. Please verify your email address to activate your account:</p>
+            <a href="${verificationUrl}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block; margin: 16px 0;">Verify Email Address</a>
+            <p>This link will expire in 24 hours.</p>
+            <p>If you didn't create an account, please ignore this email.</p>
+            <p>Best regards,<br>The EduTech LMS Team</p>
+            <hr style="margin: 20px 0; border: none; border-top: 1px solid #eee;">
+            <p style="font-size: 12px; color: #666;">
+              If the button doesn't work, copy and paste this link into your browser:<br>
+              <a href="${verificationUrl}" style="color: #3b82f6;">${verificationUrl}</a>
+            </p>
+          </div>
+        `,
+        text: `Hi ${firstName}, Welcome to EduTech LMS! Please verify your email: ${verificationUrl} (expires in 24 hours)`
+      };
+
+      const result = await transporter.sendMail(mailOptions);
+      this.logger.log(`Email verification email sent successfully to ${email}, messageId: ${result.messageId}`);
+      
+    } catch (error) {
+      this.logger.error(`Failed to send email verification email to ${email}:`, error.message);
+      // Don't throw error - registration should still succeed even if email fails
+    }
   }
 
   private async sendPasswordResetEmail(email: string, resetToken: string): Promise<void> {

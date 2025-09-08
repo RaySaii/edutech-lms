@@ -1,7 +1,21 @@
 import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { User, Organization, Course, Enrollment } from '../entities';
+import { 
+  User, 
+  Organization, 
+  Course, 
+  Enrollment, 
+  CourseReview,
+  Content,
+  ContentProgress,
+  ContentVersion,
+  MediaAsset,
+  ContentApproval,
+  NotificationEntity,
+  NotificationPreferenceEntity,
+  NotificationTemplateEntity,
+} from '../entities';
 
 @Global()
 @Module({
@@ -15,7 +29,21 @@ import { User, Organization, Course, Enrollment } from '../entities';
         username: configService.get('DB_USERNAME'),
         password: configService.get('DB_PASSWORD'),
         database: configService.get('DB_NAME'),
-        entities: [User, Organization, Course, Enrollment],
+        entities: [
+          User, 
+          Organization, 
+          Course, 
+          CourseReview, 
+          Enrollment,
+          Content,
+          ContentProgress,
+          ContentVersion,
+          MediaAsset,
+          ContentApproval,
+          NotificationEntity,
+          NotificationPreferenceEntity,
+          NotificationTemplateEntity,
+        ],
         migrations: ['dist/libs/shared/database/migrations/*.js'],
         migrationsRun: false,
         synchronize: configService.get('NODE_ENV') === 'development',

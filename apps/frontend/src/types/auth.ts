@@ -1,8 +1,6 @@
 export enum UserRole {
-  SUPER_ADMIN = 'super_admin',
   ADMIN = 'admin',
-  ORG_ADMIN = 'org_admin',
-  INSTRUCTOR = 'instructor',
+  TEACHER = 'teacher',
   STUDENT = 'student',
 }
 
@@ -36,6 +34,7 @@ export interface AuthTokens {
 export interface LoginCredentials {
   email: string;
   password: string;
+  rememberMe?: boolean;
 }
 
 export interface RegisterData {
@@ -44,6 +43,7 @@ export interface RegisterData {
   confirmPassword: string;
   firstName: string;
   lastName: string;
+  role?: UserRole;
 }
 
 export interface BackendRegisterData {
@@ -51,6 +51,7 @@ export interface BackendRegisterData {
   password: string;
   firstName: string;
   lastName: string;
+  role?: UserRole;
 }
 
 export interface AuthResponse {
@@ -69,8 +70,8 @@ export interface AuthContextType {
   tokens: AuthTokens | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (credentials: LoginCredentials) => Promise<AuthResponse>;
-  register: (data: BackendRegisterData) => Promise<AuthResponse>;
+  login: (credentials: LoginCredentials) => Promise<void>;
+  register: (data: BackendRegisterData) => Promise<void>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<AuthTokens>;
   forgotPassword: (email: string) => Promise<{ success: boolean; message: string }>;

@@ -3,6 +3,7 @@ import './globals.css'
 import { AuthProvider } from '../contexts/AuthContext'
 import { GlobalAuthGuard } from '../components/auth/GlobalAuthGuard'
 import ClientOnlyToastProvider from '../components/ui/ClientOnlyToastProvider'
+import { MainNavigation } from '../components/navigation/MainNavigation'
 
 export const metadata: Metadata = {
   title: 'EduTech LMS',
@@ -20,6 +21,7 @@ export default function RootLayout({
         <ClientOnlyToastProvider>
           <AuthProvider>
             <GlobalAuthGuard>
+              <MainNavigation />
               {children}
             </GlobalAuthGuard>
           </AuthProvider>

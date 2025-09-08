@@ -1,11 +1,17 @@
-import { Injectable, Inject, Logger, NotFoundException, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
 import { LoginDto, RegisterDto } from './dto';
+import {
+  ResponseUtil,
+  ErrorUtil,
+  LoggerUtil,
+  ValidationUtil
+} from '@edutech-lms/common';
 
 @Injectable()
 export class AuthService {
-  private readonly logger = new Logger(AuthService.name);
+  private readonly logger = LoggerUtil.createLogger(AuthService.name);
 
   constructor(
     @Inject('AUTH_SERVICE') private authClient: ClientProxy,
@@ -13,64 +19,71 @@ export class AuthService {
 
 
   async login(loginDto: LoginDto) {
-    try {
-      this.logger.log(`Login request for email: ${loginDto.email}`);
+    ValidationUtil.validateRequired(loginDto, ['email', 'password']);
+    ValidationUtil.validateEmail(loginDto.email);
+    
+    return await ErrorUtil.handleAsync(
+      async () => {
+        LoggerUtil.logWithData(this.logger, 'log', 'Login request', { email: loginDto.email });
 
-      const result = await firstValueFrom(
-        this.authClient.send({ cmd: 'login' }, loginDto)
-      );
+        const result = await firstValueFrom(
+          this.authClient.send({ cmd: 'login' }, loginDto)
+        );
 
-      // Debug: Log the result from auth service
-      this.logger.debug(`Auth service response:`, JSON.stringify(result));
+        LoggerUtil.logWithData(this.logger, 'debug', 'Auth service response received', { success: result.success });
 
-      // Check if the response indicates an error
-      if (result.success === false || (result.statusCode && result.statusCode >= 400)) {
-        if (result.statusCode === 404) {
-          throw new NotFoundException(result.message || 'User not found');
-        } else if (result.statusCode === 401) {
-          throw new UnauthorizedException(result.message || 'Invalid credentials');
-        } else if (result.statusCode === 400) {
-          throw new BadRequestException(result.message || 'Bad request');
-        } else {
-          throw new BadRequestException(result.message || 'Login failed');
+        // Handle error responses from auth service
+        if (result.success === false || (result.statusCode && result.statusCode >= 400)) {
+          this.handleAuthServiceError(result);
         }
-      }
 
-      this.logger.log(`Login successful for email: ${loginDto.email}`);
-      return result;
-    } catch (error) {
-      this.logger.error(`Login error for email: ${loginDto.email}`, error.message);
-
-      // Re-throw HTTP exceptions
-      if (error instanceof NotFoundException || error instanceof UnauthorizedException || error instanceof BadRequestException) {
-        throw error;
-      }
-
-      // For other errors, throw generic bad request
-      throw new BadRequestException('Login failed');
+        LoggerUtil.logWithData(this.logger, 'log', 'Login successful', { email: loginDto.email });
+        return result;
+      },
+      'login',
+      this.logger,
+      'Unable to sign in right now. Please try again in a moment.'
+    );
+  }
+  
+  private handleAuthServiceError(result: any): never {
+    switch (result.statusCode) {
+      case 404:
+        ErrorUtil.throwNotFound('User');
+        break;
+      case 401:
+        ErrorUtil.throwUnauthorized(result.message || 'Invalid credentials');
+        break;
+      case 400:
+        ErrorUtil.throwBadRequest(result.message || 'Invalid request');
+        break;
+      case 500:
+        ErrorUtil.throwBadRequest('We\'re experiencing technical difficulties. Please try again in a moment.');
+        break;
+      default:
+        ErrorUtil.throwBadRequest(result.message || 'Unable to process request');
     }
   }
 
   async register(registerDto: RegisterDto) {
-    try {
-      this.logger.log(`Registration request for email: ${registerDto.email}`);
+    ValidationUtil.validateRequired(registerDto, ['email', 'password', 'firstName', 'lastName']);
+    ValidationUtil.validateEmail(registerDto.email);
+    
+    return await ErrorUtil.handleAsync(
+      async () => {
+        LoggerUtil.logWithData(this.logger, 'log', 'Registration request', { email: registerDto.email });
 
-      const result = await firstValueFrom(
-        this.authClient.send({ cmd: 'register' }, registerDto)
-      );
+        const result = await firstValueFrom(
+          this.authClient.send({ cmd: 'register' }, registerDto)
+        );
 
-      this.logger.log(`Registration successful for email: ${registerDto.email}`);
-      return result;
-    } catch (error) {
-      this.logger.error(`Registration error for email: ${registerDto.email}`, error.message);
-
-      // Re-throw the error with proper HTTP status codes
-      if (error.message?.includes('already exists') || error.message?.includes('duplicate')) {
-        throw new BadRequestException('Email already registered');
-      } else {
-        throw new BadRequestException('Registration failed');
-      }
-    }
+        LoggerUtil.logWithData(this.logger, 'log', 'Registration successful', { email: registerDto.email });
+        return result;
+      },
+      'registration',
+      this.logger,
+      'Registration failed'
+    );
   }
 
   async refreshToken(refreshToken: string) {
@@ -196,23 +209,23 @@ export class AuthService {
   }
 
   async getUserProfile(userId: string) {
-    try {
-      this.logger.log(`Profile request for user: ${userId}`);
+    ValidationUtil.validateUUID(userId, 'User ID');
+    
+    return await ErrorUtil.handleAsync(
+      async () => {
+        LoggerUtil.logWithData(this.logger, 'log', 'Profile request', { userId });
 
-      const result = await firstValueFrom(
-        this.authClient.send({ cmd: 'get_user_profile' }, { userId })
-      );
+        const result = await firstValueFrom(
+          this.authClient.send({ cmd: 'get_user_profile' }, { userId })
+        );
 
-      this.logger.log(`Profile retrieved for user: ${userId}`);
-      return result;
-    } catch (error) {
-      this.logger.error(`Profile retrieval error for user: ${userId}`, error.message);
-      return {
-        success: false,
-        message: 'Profile retrieval failed',
-        error: error.message
-      };
-    }
+        LoggerUtil.logWithData(this.logger, 'log', 'Profile retrieved successfully', { userId });
+        return result;
+      },
+      'get user profile',
+      this.logger,
+      'Profile retrieval failed'
+    );
   }
 
   async setup2FA(userId: string) {
@@ -325,21 +338,22 @@ export class AuthService {
   }
 
   async checkEmailAvailability(email: string) {
-    try {
-      this.logger.log(`Email availability check for: ${email}`);
+    ValidationUtil.validateEmail(email);
+    
+    return await ErrorUtil.handleAsync(
+      async () => {
+        LoggerUtil.logWithData(this.logger, 'log', 'Email availability check', { email });
 
-      const result = await firstValueFrom(
-        this.authClient.send({ cmd: 'check_email_availability' }, { email })
-      );
+        const result = await firstValueFrom(
+          this.authClient.send({ cmd: 'check_email_availability' }, { email })
+        );
 
-      this.logger.log(`Email availability check completed for: ${email}`);
-      return result;
-    } catch (error) {
-      this.logger.error(`Email availability check error for: ${email}`, error.message);
-      return {
-        available: true,
-        message: 'Unable to check email availability'
-      };
-    }
+        LoggerUtil.logWithData(this.logger, 'log', 'Email availability check completed', { email, available: result.available });
+        return result;
+      },
+      'check email availability',
+      this.logger,
+      'Unable to check email availability'
+    );
   }
 }

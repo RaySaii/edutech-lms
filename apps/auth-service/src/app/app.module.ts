@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ClientsModule, Transport } from '@nestjs/microservices';
 import { SharedDatabaseModule } from '@edutech-lms/database';
 import { SharedAuthModule } from '@edutech-lms/auth';
 import { AppController } from './app.controller';
@@ -18,6 +19,20 @@ import { configuration } from '@edutech-lms/common';
       isGlobal: true,
       load: [configuration],
     }),
+    ClientsModule.registerAsync([
+      {
+        name: 'NOTIFICATION_SERVICE',
+        imports: [ConfigModule],
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.TCP,
+          options: {
+            host: configService.get('NOTIFICATION_SERVICE_HOST', 'localhost'),
+            port: configService.get('NOTIFICATION_SERVICE_PORT', 3004),
+          },
+        }),
+        inject: [ConfigService],
+      },
+    ]),
     SharedDatabaseModule,
     SharedAuthModule,
     TypeOrmModule.forFeature([User, Organization]),

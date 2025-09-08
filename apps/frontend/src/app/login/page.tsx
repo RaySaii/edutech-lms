@@ -4,13 +4,22 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LoginForm } from '../../components/auth/LoginForm';
 import { RegisterForm } from '../../components/auth/RegisterForm';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const router = useRouter();
+  const { user } = useAuth();
 
   const handleSuccess = () => {
-    router.push('/dashboard');
+    // Redirect based on user role
+    if (user?.role === 'admin') {
+      router.push('/admin/analytics');
+    } else if (user?.role === 'teacher') {
+      router.push('/dashboard');
+    } else {
+      router.push('/dashboard');
+    }
   };
 
   return (

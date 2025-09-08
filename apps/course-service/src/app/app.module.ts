@@ -7,7 +7,7 @@ import { AppService } from './app.service';
 import { CourseController } from './course/course.controller';
 import { CourseService } from './course/course.service';
 import { EnrollmentService } from './enrollment/enrollment.service';
-import { Course, User, Enrollment, Organization } from '@edutech-lms/database';
+import { Course, User, Enrollment, Organization, CourseReview } from '@edutech-lms/database';
 import { configuration } from '@edutech-lms/common';
 
 @Module({
@@ -17,7 +17,7 @@ import { configuration } from '@edutech-lms/common';
       load: [configuration],
     }),
     SharedDatabaseModule,
-    TypeOrmModule.forFeature([Course, User, Enrollment, Organization]),
+    TypeOrmModule.forFeature([Course, User, Enrollment, Organization, CourseReview]),
   ],
   controllers: [AppController, CourseController],
   providers: [AppService, CourseService, EnrollmentService],

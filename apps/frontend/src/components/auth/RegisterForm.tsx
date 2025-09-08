@@ -2,11 +2,12 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { RegisterData } from '../../types/auth';
-import { Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { RegisterData, UserRole } from '../../types/auth';
+import { Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle, Loader2, GraduationCap } from 'lucide-react';
 import { useToast } from '../ui/toast';
-import { authAPI } from '../../lib/auth';
+import { authAPI } from '../../lib/api/auth';
 import { useDebounce } from 'ahooks';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 interface RegisterFormProps {
   onSuccess?: () => void;
@@ -22,6 +23,7 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
     confirmPassword: '',
     firstName: '',
     lastName: '',
+    role: UserRole.STUDENT,
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -112,18 +114,23 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
     try {
       // Remove confirmPassword before sending to backend
       const { confirmPassword, ...registrationData } = formData;
-      const response = await register(registrationData);
-      if (response.success) {
+      const response = await authAPI.register(registrationData);
+      
+      // Check if email verification is required based on user status
+      if (response.data?.user?.status === 'pending_verification') {
+        showSuccess(
+          'Registration Successful!',
+          'Your account has been created successfully. Please check your email for a verification link to activate your account.'
+        );
+      } else {
+        // If no email verification needed, proceed with normal login flow
+        await register(registrationData);
         showSuccess(
           'Registration Successful!',
           'Your account has been created successfully. Welcome to EduTech LMS!'
         );
-        onSuccess?.();
-      } else {
-        const errorMessage = response.message || 'Registration failed';
-        setError(errorMessage);
-        showError('Registration Failed', errorMessage);
       }
+      onSuccess?.();
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Registration failed';
       setError(errorMessage);
@@ -217,6 +224,30 @@ export function RegisterForm({ onSuccess, onLoginClick }: RegisterFormProps) {
                   data-testid="last-name-input"
                 />
               </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              I want to join as
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center justify-center z-10 pointer-events-none">
+                <GraduationCap className="h-4 w-4 text-gray-400" />
+              </div>
+              <Select
+                value={formData.role}
+                onValueChange={(value: UserRole) => setFormData(prev => ({ ...prev, role: value }))}
+                disabled={isLoading}
+              >
+                <SelectTrigger className="w-full pl-9 pr-3 py-2.5 h-auto border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent" data-testid="role-select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UserRole.STUDENT}>Student - Learn from courses</SelectItem>
+                  <SelectItem value={UserRole.TEACHER}>Teacher - Create and manage courses</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

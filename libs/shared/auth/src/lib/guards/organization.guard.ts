@@ -17,8 +17,8 @@ export class OrganizationGuard implements CanActivate {
       return false;
     }
     
-    // Super admins and global admins can access any organization
-    if (user.role === UserRole.SUPER_ADMIN || user.role === UserRole.ADMIN) {
+    // Global admins can access any organization
+    if (user.role === UserRole.ADMIN) {
       return true;
     }
     

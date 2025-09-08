@@ -4,6 +4,7 @@ import { CourseStatus, CourseLevel } from '@edutech-lms/common';
 import { Organization } from './organization.entity';
 import { User } from './user.entity';
 import { Enrollment } from './enrollment.entity';
+import { CourseReview } from './course-review.entity';
 
 @Entity('courses')
 @Index(['slug', 'organizationId'], { unique: true })
@@ -42,6 +43,18 @@ export class Course extends BaseEntity {
 
   @Column('simple-array', { nullable: true })
   tags: string[];
+
+  @Column({ nullable: true })
+  category: string;
+
+  @Column({ type: 'boolean', default: false })
+  isPublished: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  isFeatured: boolean;
+
+  @Column({ type: 'int', nullable: true })
+  featuredOrder: number;
 
   @Column('json', { nullable: true })
   curriculum: {
@@ -83,6 +96,9 @@ export class Course extends BaseEntity {
 
   @OneToMany(() => Enrollment, enrollment => enrollment.course)
   enrollments: Enrollment[];
+
+  @OneToMany(() => CourseReview, review => review.course)
+  reviews: CourseReview[];
 
   @Column({ type: 'timestamp', nullable: true })
   publishedAt: Date;

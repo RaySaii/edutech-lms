@@ -40,7 +40,6 @@ export class AuthController {
   @ApiOperation({ summary: 'Check email availability' })
   @ApiResponse({ status: 200, description: 'Email availability checked' })
   async checkEmailAvailability(@Body() body: { email: string }) {
-    console.log(23123)
     return this.authService.checkEmailAvailability(body.email);
   }
 
@@ -158,7 +157,7 @@ export class AuthController {
 
   // Admin endpoints
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.ADMIN)
   @Get('users')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all users (Admin only)' })
@@ -169,7 +168,7 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.ADMIN)
   @Patch('users/:userId/status')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update user status (Admin only)' })

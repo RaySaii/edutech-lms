@@ -33,6 +33,14 @@
           "buildTarget": "course-service:build:production"
         }
       }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/{projectName}"],
+      "options": {
+        "jestConfig": "apps/course-service/jest.config.ts",
+        "passWithNoTests": true
+      }
     }
   },
   "tags": []

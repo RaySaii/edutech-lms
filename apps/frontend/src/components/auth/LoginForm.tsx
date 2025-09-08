@@ -9,6 +9,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Alert, AlertDescription } from '../ui/alert';
+import { useRouter } from 'next/navigation';
 
 interface LoginFormProps {
   onSuccess?: () => void;
@@ -20,11 +21,13 @@ export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
   const [credentials, setCredentials] = useState<LoginCredentials>({
     email: '',
     password: '',
+    rememberMe: false,
   });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const router = useRouter();
 
   const validateForm = () => {
     let isValid = true;
@@ -58,36 +61,20 @@ export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
     }
 
     try {
-      const response = await login(credentials);
-
-      if (response.success) {
-        onSuccess?.();
-      } else {
-        // Use the error message directly from the backend
-        const errorMessage = response.message || 'Login failed. Please try again.';
-        setError(errorMessage);
-      }
+      await login(credentials);
+      onSuccess?.();
     } catch (err: unknown) {
-      // Handle network/connection errors only
-      let errorMessage = 'An unexpected error occurred. Please try again.';
-
-      if (err instanceof Error) {
-        if (err.message.toLowerCase().includes('network')) {
-          errorMessage = 'Network error. Please check your internet connection.';
-        } else if (err.message.toLowerCase().includes('timeout')) {
-          errorMessage = 'Request timed out. Please try again.';
-        }
-      }
+      const errorMessage = 'Login failed';
 
       setError(errorMessage);
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setCredentials(prev => ({
       ...prev,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value
     }));
 
     // Clear validation errors when user starts typing
@@ -107,9 +94,18 @@ export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
           <CardDescription>Sign in to your account</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6" data-testid="login-form" role="form">
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-6"
+            data-testid="login-form"
+            role="form"
+          >
             {error && (
-              <Alert variant="destructive" data-testid="error-message" role="alert">
+              <Alert
+                variant="destructive"
+                data-testid="error-message"
+                role="alert"
+              >
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
@@ -124,6 +120,7 @@ export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
                   name="email"
                   type="email"
                   autoComplete="email"
+                  autoFocus={false}
                   required
                   value={credentials.email}
                   onChange={handleChange}
@@ -134,7 +131,10 @@ export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
                   aria-label="Email Address"
                 />
                 {emailError && (
-                  <span data-testid="email-validation-error" className="text-red-500 text-sm mt-1 block">
+                  <span
+                    data-testid="email-validation-error"
+                    className="text-red-500 text-sm mt-1 block"
+                  >
                     {emailError}
                   </span>
                 )}
@@ -175,7 +175,10 @@ export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
                   )}
                 </Button>
                 {passwordError && (
-                  <span data-testid="password-validation-error" className="text-red-500 text-sm mt-1 block">
+                  <span
+                    data-testid="password-validation-error"
+                    className="text-red-500 text-sm mt-1 block"
+                  >
                     {passwordError}
                   </span>
                 )}
@@ -186,8 +189,10 @@ export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
               <div className="flex items-center space-x-2">
                 <input
                   id="remember-me"
-                  name="remember-me"
+                  name="rememberMe"
                   type="checkbox"
+                  checked={credentials.rememberMe}
+                  onChange={handleChange}
                   className="h-4 w-4 text-primary focus:ring-primary border-border rounded"
                   data-testid="remember-me"
                 />
@@ -199,14 +204,22 @@ export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
               <Button
                 variant="link"
                 className="px-0 text-sm"
-                onClick={() => window.location.href = '/forgot-password'}
+                onClick={(e) => {
+                  e.preventDefault();
+                  router.push('/forgot-password');
+                }}
                 data-testid="forgot-password-link"
               >
                 Forgot password?
               </Button>
             </div>
 
-            <Button type="submit" disabled={isLoading} className="w-full" data-testid="login-submit">
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="w-full"
+              data-testid="login-submit"
+            >
               {isLoading ? (
                 <div className="flex items-center">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground mr-2"></div>

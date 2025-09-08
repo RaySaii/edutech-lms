@@ -17,28 +17,39 @@ export class AuthService {
     return null;
   }
 
-  async generateTokens(user: any) {
+  async generateTokens(user: any, rememberMe = false) {
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
       role: user.role,
+      status: user.status,
       organizationId: user.organizationId,
     };
 
+    // Extend token expiration if rememberMe is true
+    const accessExpires = rememberMe 
+      ? this.configService.get('JWT_ACCESS_EXPIRES_REMEMBER', '2h')
+      : this.configService.get('JWT_ACCESS_EXPIRES', '15m');
+    
+    const refreshExpires = rememberMe
+      ? this.configService.get('JWT_REFRESH_EXPIRES_REMEMBER', '30d')
+      : this.configService.get('JWT_REFRESH_EXPIRES', '7d');
+
     const accessToken = this.jwtService.sign(payload, {
       secret: this.configService.get('JWT_ACCESS_SECRET'),
-      expiresIn: this.configService.get('JWT_ACCESS_EXPIRES', '15m'),
+      expiresIn: accessExpires,
     });
 
     const refreshToken = this.jwtService.sign(payload, {
       secret: this.configService.get('JWT_REFRESH_SECRET'),
-      expiresIn: this.configService.get('JWT_REFRESH_EXPIRES', '7d'),
+      expiresIn: refreshExpires,
     });
 
     return {
       accessToken,
       refreshToken,
-      expiresIn: this.configService.get('JWT_ACCESS_EXPIRES', '15m'),
+      expiresIn: accessExpires,
+      rememberMe, // Include remember me flag in response for client reference
     };
   }
 

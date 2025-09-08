@@ -4,3 +4,6 @@ export * from './entities/user.entity';
 export * from './entities/organization.entity';
 export * from './entities/course.entity';
 export * from './entities/enrollment.entity';
+export * from './entities/course-review.entity';
+export * from './entities/content.entity';
+export * from './entities/content-progress.entity';

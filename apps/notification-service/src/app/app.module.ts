@@ -8,6 +8,12 @@ import { NotificationService } from './notification/notification.service';
 import { EmailService } from './email/email.service';
 import { EmailProcessor } from './email/email.processor';
 import { configuration } from '@edutech-lms/common';
+import { SharedDatabaseModule } from '@edutech-lms/database';
+import { NotificationModule } from './notification/notification.module';
+import { NotificationPreferenceService } from './notification/notification-preference.service';
+import { NotificationTemplateService } from './notification/notification-template.service';
+import { PushNotificationService } from './push/push-notification.service';
+import { SmsService } from './sms/sms.service';
 
 @Module({
   imports: [
@@ -15,6 +21,7 @@ import { configuration } from '@edutech-lms/common';
       isGlobal: true,
       load: [configuration],
     }),
+    SharedDatabaseModule,
     BullModule.forRoot({
       redis: {
         host: process.env.REDIS_HOST || 'localhost',
@@ -25,8 +32,24 @@ import { configuration } from '@edutech-lms/common';
     BullModule.registerQueue({
       name: 'email',
     }),
+    BullModule.registerQueue({
+      name: 'push',
+    }),
+    BullModule.registerQueue({
+      name: 'sms',
+    }),
+    NotificationModule,
   ],
   controllers: [AppController, NotificationController],
-  providers: [AppService, NotificationService, EmailService, EmailProcessor],
+  providers: [
+    AppService, 
+    NotificationService, 
+    EmailService, 
+    EmailProcessor,
+    NotificationPreferenceService,
+    NotificationTemplateService,
+    PushNotificationService,
+    SmsService,
+  ],
 })
 export class AppModule {}

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Mail, ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
-import { authAPI } from '../../lib/auth';
+import { authAPI } from '../../lib/api/auth';
 import { useToast } from '../ui/toast';
 
 interface ForgotPasswordFormProps {
@@ -26,7 +26,7 @@ export function ForgotPasswordForm({ onBackClick, onSuccess }: ForgotPasswordFor
       // Always show generic success message regardless of whether user exists
       // This prevents user enumeration attacks
       await authAPI.forgotPassword({ email });
-      
+
       setIsSubmitted(true);
       showSuccess(
         'Password Reset Requested',
@@ -35,7 +35,7 @@ export function ForgotPasswordForm({ onBackClick, onSuccess }: ForgotPasswordFor
       onSuccess?.();
     } catch (error) {
       console.error('Password reset error:', error);
-      
+
       // Even on errors, show generic message to prevent user enumeration
       setIsSubmitted(true);
       showSuccess(

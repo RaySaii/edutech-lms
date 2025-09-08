@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Lock, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
-import { authAPI } from '../../lib/auth';
+import { authAPI } from '../../lib/api/auth';
 import { useToast } from '../../components/ui/toast';
 
 export default function ResetPasswordPage() {

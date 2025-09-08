@@ -72,7 +72,7 @@ export function withAuth<P extends object>(
 export function AdminOnly({ children }: { children: React.ReactNode }) {
   return (
     <ProtectedRoute
-      requiredRoles={[UserRole.ADMIN, UserRole.SUPER_ADMIN]}
+      requiredRoles={[UserRole.ADMIN]}
       redirectTo="/unauthorized"
     >
       {children}
@@ -83,7 +83,7 @@ export function AdminOnly({ children }: { children: React.ReactNode }) {
 export function InstructorOnly({ children }: { children: React.ReactNode }) {
   return (
     <ProtectedRoute
-      requiredRoles={[UserRole.INSTRUCTOR, UserRole.ADMIN, UserRole.SUPER_ADMIN]}
+      requiredRoles={[UserRole.TEACHER, UserRole.ADMIN]}
       redirectTo="/unauthorized"
     >
       {children}
@@ -94,7 +94,7 @@ export function InstructorOnly({ children }: { children: React.ReactNode }) {
 export function StudentAndUp({ children }: { children: React.ReactNode }) {
   return (
     <ProtectedRoute
-      requiredRoles={[UserRole.STUDENT, UserRole.INSTRUCTOR, UserRole.ORG_ADMIN, UserRole.ADMIN, UserRole.SUPER_ADMIN]}
+      requiredRoles={[UserRole.STUDENT, UserRole.TEACHER, UserRole.ADMIN]}
       redirectTo="/unauthorized"
     >
       {children}

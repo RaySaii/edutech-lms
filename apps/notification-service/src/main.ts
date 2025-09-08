@@ -14,7 +14,7 @@ async function bootstrap() {
   const port = process.env.NOTIFICATION_SERVICE_PORT || 3004;
   await app.listen(port);
   Logger.log(
-    `🚀 Application is running on: http://localhost:${port}/${globalPrefix}`
+    `🚀 Notification Service is running on: http://localhost:${port}/${globalPrefix}`
   );
 }
 

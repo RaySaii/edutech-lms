@@ -4,7 +4,7 @@ import React, { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 
-const publicRoutes = ['/login', '/register', '/forgot-password', '/reset-password'];
+const publicRoutes = ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email', '/courses'];
 
 interface GlobalAuthGuardProps {
   children: React.ReactNode;

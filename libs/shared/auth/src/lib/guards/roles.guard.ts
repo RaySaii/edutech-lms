@@ -44,12 +44,9 @@ export class RolesGuard implements CanActivate {
   }
   
   private checkRoleAccess(userRole: UserRole, requiredRoles: UserRole[]): boolean {
-    // Define role hierarchy (higher roles include permissions of lower roles)
+    // Define role hierarchy - simplified for self-learning system
     const roleHierarchy = {
-      [UserRole.SUPER_ADMIN]: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.ORG_ADMIN, UserRole.INSTRUCTOR, UserRole.STUDENT],
-      [UserRole.ADMIN]: [UserRole.ADMIN, UserRole.ORG_ADMIN, UserRole.INSTRUCTOR, UserRole.STUDENT],
-      [UserRole.ORG_ADMIN]: [UserRole.ORG_ADMIN, UserRole.INSTRUCTOR, UserRole.STUDENT],
-      [UserRole.INSTRUCTOR]: [UserRole.INSTRUCTOR, UserRole.STUDENT],
+      [UserRole.ADMIN]: [UserRole.ADMIN, UserRole.STUDENT],
       [UserRole.STUDENT]: [UserRole.STUDENT],
     };
     

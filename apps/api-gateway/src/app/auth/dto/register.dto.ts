@@ -1,5 +1,6 @@
-import { IsEmail, IsNotEmpty, MinLength, IsOptional, IsString } from 'class-validator';
+import { IsEmail, IsNotEmpty, MinLength, IsOptional, IsString, IsEnum } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { UserRole } from '@edutech-lms/common';
 
 export class RegisterDto {
   @ApiProperty({
@@ -52,4 +53,14 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   organizationSlug?: string;
+
+  @ApiProperty({
+    example: 'instructor',
+    description: 'User role (instructor for teachers, student for learners)',
+    enum: UserRole,
+    required: false
+  })
+  @IsOptional()
+  @IsEnum(UserRole)
+  role?: UserRole;
 }
