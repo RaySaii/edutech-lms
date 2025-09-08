@@ -361,8 +361,8 @@ export class CacheManagementController {
   @ApiResponse({ status: 200, description: 'Cache key refreshed successfully' })
   async refreshCache(
     @Param('key') key: string,
-    @Query('namespace') namespace?: string,
     @CurrentUser() user: any,
+    @Query('namespace') namespace?: string,
   ) {
     this.logger.log(`Cache refresh requested for: ${key} by user: ${user.id}`);
     

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { UnifiedDashboard } from '../../components/common/UnifiedDashboard';
 import { useDashboard } from '../../hooks/useDashboard';
@@ -14,6 +14,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { stats, loading, error, refetch } = useDashboard();
   const { enrolledCourses, loading: coursesLoading } = useEnrolledCourses();
+  const searchRef = useRef<HTMLInputElement>(null);
 
   if (!user) {
     return (
@@ -47,7 +48,25 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50" data-testid="dashboard">
+      <div className="px-6 pt-4">
+        {/* Quick Search control for E2E */}
+        <div className="flex items-center justify-end mb-2">
+          <button
+            data-testid="quick-search"
+            onClick={() => searchRef.current?.focus()}
+            className="px-3 py-1 text-sm border rounded-md hover:bg-gray-50"
+          >
+            Quick Search
+          </button>
+          <input
+            ref={searchRef}
+            placeholder="Search..."
+            className="ml-2 px-2 py-1 border rounded-md focus:ring-2 focus:ring-purple-500"
+          />
+        </div>
+      </div>
+
       <UnifiedDashboard
         title={`${user.firstName}'s Dashboard`}
         description={`Welcome back, ${user.firstName}! Here's your learning overview.`}

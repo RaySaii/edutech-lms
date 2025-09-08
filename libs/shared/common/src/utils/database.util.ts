@@ -199,9 +199,9 @@ export class DatabaseUtil {
     let entity = await repository.findOne({ where: criteria });
     
     if (!entity) {
-      entity = repository.create(createData as any);
-      entity = await repository.save(entity);
-      return { entity, created: true };
+      const newEntity = repository.create(createData as any);
+      const savedEntity = await repository.save(newEntity);
+      return { entity: savedEntity as T, created: true };
     }
 
     return { entity, created: false };

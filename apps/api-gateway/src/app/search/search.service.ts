@@ -81,15 +81,16 @@ export class SearchService {
       const startTime = Date.now();
       const response = await this.client.search({
         index: indexName,
-        body: esQuery,
+        ...esQuery,
         from: ((searchQuery.page || 1) - 1) * (searchQuery.limit || 20),
         size: searchQuery.limit || 20,
-      });
+      } as any);
 
       const took = Date.now() - startTime;
 
       // Process results
-      const results: SearchResult[] = response.body.hits.hits.map((hit: any) => ({
+      const responseBody = (response as any).body || response;
+      const results: SearchResult[] = responseBody.hits.hits.map((hit: any) => ({
         id: hit._id,
         type: 'course',
         title: hit._source.title,
@@ -109,14 +110,14 @@ export class SearchService {
       }));
 
       // Process facets/aggregations
-      const facets = searchQuery.facets ? this.processFacets(response.body.aggregations) : undefined;
+      const facets = searchQuery.facets ? this.processFacets(responseBody.aggregations) : undefined;
 
       // Generate suggestions for empty results
       const suggestions = results.length === 0 ? await this.generateSuggestions(searchQuery.query) : undefined;
 
       return {
         results,
-        total: response.body.hits.total.value,
+        total: responseBody.hits.total.value || responseBody.hits.total,
         page: searchQuery.page || 1,
         limit: searchQuery.limit || 20,
         facets,
@@ -145,14 +146,15 @@ export class SearchService {
       const startTime = Date.now();
       const response = await this.client.search({
         index: indices.join(','),
-        body: esQuery,
+        ...esQuery,
         from: ((searchQuery.page || 1) - 1) * (searchQuery.limit || 20),
         size: searchQuery.limit || 20,
-      });
+      } as any);
 
       const took = Date.now() - startTime;
+      const responseBody = (response as any).body || response;
 
-      const results: SearchResult[] = response.body.hits.hits.map((hit: any) => ({
+      const results: SearchResult[] = responseBody.hits.hits.map((hit: any) => ({
         id: hit._id,
         type: this.getTypeFromIndex(hit._index),
         title: hit._source.title || hit._source.name || hit._source.subject,
@@ -164,7 +166,7 @@ export class SearchService {
 
       return {
         results,
-        total: response.body.hits.total.value,
+        total: responseBody.hits.total.value || responseBody.hits.total,
         page: searchQuery.page || 1,
         limit: searchQuery.limit || 20,
         took,
@@ -181,21 +183,20 @@ export class SearchService {
       
       const response = await this.client.search({
         index: indexName,
-        body: {
-          suggest: {
-            course_suggest: {
-              prefix: query.toLowerCase(),
-              completion: {
-                field: 'suggest',
-                size: 10,
-                skip_duplicates: true,
-              },
+        suggest: {
+          course_suggest: {
+            prefix: query.toLowerCase(),
+            completion: {
+              field: 'suggest',
+              size: 10,
+              skip_duplicates: true,
             },
           },
         },
-      });
+      } as any);
 
-      const suggestions = response.body.suggest.course_suggest[0]?.options.map(
+      const responseBody = (response as any).body || response;
+      const suggestions = responseBody.suggest.course_suggest[0]?.options.map(
         (option: any) => option.text
       ) || [];
 
@@ -249,9 +250,9 @@ export class SearchService {
       await this.client.index({
         index: indexName,
         id: course.id,
-        body: document,
+        document: document,
         refresh: 'wait_for',
-      });
+      } as any);
 
       this.logger.debug(`Indexed course: ${course.title}`);
     } catch (error) {
@@ -286,9 +287,9 @@ export class SearchService {
       await this.client.index({
         index: indexName,
         id: user.id,
-        body: document,
+        document: document,
         refresh: 'wait_for',
-      });
+      } as any);
     } catch (error) {
       this.logger.error(`Failed to index user ${user.id}:`, error);
     }
@@ -343,33 +344,32 @@ export class SearchService {
     try {
       const response = await this.client.search({
         index: `${this.indexPrefix}-analytics`,
-        body: {
-          aggs: {
-            popular_queries: {
-              terms: {
-                field: 'query.keyword',
-                size: 10,
-              },
+        aggs: {
+          popular_queries: {
+            terms: {
+              field: 'query.keyword',
+              size: 10,
             },
-            search_volume: {
-              date_histogram: {
-                field: 'timestamp',
-                interval: 'day',
-              },
+          },
+          search_volume: {
+            date_histogram: {
+              field: 'timestamp',
+              interval: 'day',
             },
-            zero_results: {
-              filter: {
-                term: { results_count: 0 },
-              },
+          },
+          zero_results: {
+            filter: {
+              term: { results_count: 0 },
             },
           },
         },
-      });
+      } as any);
 
+      const responseBody = (response as any).body || response;
       return {
-        popularQueries: response.body.aggregations.popular_queries.buckets,
-        searchVolume: response.body.aggregations.search_volume.buckets,
-        zeroResultsCount: response.body.aggregations.zero_results.doc_count,
+        popularQueries: responseBody.aggregations.popular_queries.buckets,
+        searchVolume: responseBody.aggregations.search_volume.buckets,
+        zeroResultsCount: responseBody.aggregations.zero_results.doc_count,
       };
     } catch (error) {
       this.logger.error('Failed to get search analytics:', error);
@@ -541,23 +541,21 @@ export class SearchService {
     
     await this.client.indices.create({
       index: indexName,
-      body: {
-        mappings,
-        settings: {
-          number_of_shards: 1,
-          number_of_replicas: 1,
-          analysis: {
-            analyzer: {
-              custom_search_analyzer: {
-                type: 'custom',
-                tokenizer: 'standard',
-                filter: ['lowercase', 'stop', 'stemmer'],
-              },
+      mappings,
+      settings: {
+        number_of_shards: 1,
+        number_of_replicas: 1,
+        analysis: {
+          analyzer: {
+            custom_search_analyzer: {
+              type: 'custom',
+              tokenizer: 'standard',
+              filter: ['lowercase', 'stop', 'stemmer'],
             },
           },
         },
       },
-    });
+    } as any);
   }
 
   private getIndexMappings(indexName: string): any {

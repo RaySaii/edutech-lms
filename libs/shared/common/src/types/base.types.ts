@@ -12,11 +12,3 @@ export interface PaginatedResult<T> {
   hasNext: boolean;
   hasPrev: boolean;
 }
-
-export interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  message?: string;
-  errors?: string[];
-  timestamp: string;
-}

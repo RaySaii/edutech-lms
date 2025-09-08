@@ -6,11 +6,14 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 async function bootstrap() {
   const logger = new Logger('ContentService');
   
+  const host = process.env.CONTENT_SERVICE_HOST || 'localhost';
+  const port = parseInt(process.env.CONTENT_SERVICE_PORT || process.env.PORT || '3004', 10);
+
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(AppModule, {
     transport: Transport.TCP,
     options: {
-      host: 'localhost',
-      port: parseInt(process.env.PORT) || 3004,
+      host,
+      port,
     },
   });
 
@@ -24,7 +27,7 @@ async function bootstrap() {
   );
 
   await app.listen();
-  logger.log(`🚀 Content Service is listening on port ${parseInt(process.env.PORT) || 3004}`);
+  logger.log(`🚀 Content Service is listening on ${host}:${port}`);
 }
 
 bootstrap().catch((error) => {

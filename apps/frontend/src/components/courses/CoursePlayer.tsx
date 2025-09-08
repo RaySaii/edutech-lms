@@ -467,6 +467,7 @@ export function CoursePlayer({ courseId, lessonId }: CoursePlayerProps) {
               src={currentLesson.videoUrl}
               poster="https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=1200&h=675&fit=crop&crop=entropy&auto=format"
               onClick={togglePlay}
+              data-testid="video-player"
             />
 
             {/* Video Controls */}
@@ -499,6 +500,7 @@ export function CoursePlayer({ courseId, lessonId }: CoursePlayerProps) {
                     size="sm"
                     onClick={togglePlay}
                     className="text-white hover:bg-white/20"
+                    data-testid={isPlaying ? 'pause-button' : 'play-button'}
                   >
                     {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
                   </Button>
@@ -553,6 +555,7 @@ export function CoursePlayer({ courseId, lessonId }: CoursePlayerProps) {
                     size="sm"
                     onClick={toggleFullscreen}
                     className="text-white hover:bg-white/20"
+                    data-testid="fullscreen-button"
                   >
                     <Maximize className="h-5 w-5" />
                   </Button>

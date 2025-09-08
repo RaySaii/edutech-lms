@@ -9,7 +9,6 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@edutech-lms/auth';
-import { ResponseTransformInterceptor } from '../common/interceptors/response-transform.interceptor';
 import { SearchService, SearchQuery, SearchResponse } from './search.service';
 import { IsOptional, IsString, IsInt, IsBoolean, IsEnum, Min, Max } from 'class-validator';
 import { Transform, Type } from 'class-transformer';

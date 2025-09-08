@@ -6,6 +6,7 @@ import { NotificationService } from './notification.service';
 import { NotificationPreferenceService } from './notification-preference.service';
 import { NotificationTemplateService } from './notification-template.service';
 import { EmailService } from '../email/email.service';
+import { EmailProcessor } from '../email/email.processor';
 import { PushNotificationService } from '../push/push-notification.service';
 import { SmsService } from '../sms/sms.service';
 import {
@@ -22,7 +23,13 @@ import {
       NotificationTemplateEntity,
     ]),
     BullModule.registerQueue({
-      name: 'notification-processing',
+      name: 'email',
+    }),
+    BullModule.registerQueue({
+      name: 'push',
+    }),
+    BullModule.registerQueue({
+      name: 'sms',
     }),
   ],
   controllers: [NotificationController],
@@ -31,6 +38,7 @@ import {
     NotificationPreferenceService,
     NotificationTemplateService,
     EmailService,
+    EmailProcessor,
     PushNotificationService,
     SmsService,
   ],

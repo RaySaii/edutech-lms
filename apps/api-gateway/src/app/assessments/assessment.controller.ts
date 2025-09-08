@@ -63,8 +63,8 @@ export class AssessmentController {
   @ApiResponse({ status: 200, description: 'Assessments retrieved successfully' })
   async getAssessmentsByCourse(
     @Param('courseId', ParseUUIDPipe) courseId: string,
-    @Query('status') status?: AssessmentStatus,
     @CurrentUser() user: any,
+    @Query('status') status?: AssessmentStatus,
   ) {
     this.logger.log(`Course assessments requested for course: ${courseId} by user: ${user.id}`);
     

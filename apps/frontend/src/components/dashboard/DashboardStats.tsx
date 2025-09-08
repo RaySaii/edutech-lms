@@ -12,8 +12,10 @@ interface DashboardStatsProps {
 }
 
 const DashboardStats = React.memo<DashboardStatsProps>(({ stats, userRole, loading = false }) => {
+  const normalizedRole = (userRole || '').toString().trim().toUpperCase();
+  const isInstructor = normalizedRole === 'INSTRUCTOR' || normalizedRole === 'TEACHER';
   const getStatsCards = () => {
-    if (userRole === 'teacher') {
+    if (isInstructor) {
       return [
         {
           title: 'Created Courses',

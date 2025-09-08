@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, ILike } from 'typeorm';
 import { Course, User, Enrollment, CourseReview } from '@edutech-lms/database';
@@ -153,7 +153,10 @@ export class CourseService {
       });
 
       const savedCourse = await this.courseRepository.save(course);
-      LoggerUtil.logWithData(this.logger, 'log', 'Course created', { courseId: savedCourse.id, instructorId });
+      LoggerUtil.logWithData(this.logger, 'log', 'Course created', { 
+        courseId: Array.isArray(savedCourse) ? savedCourse[0]?.id : (savedCourse as any).id, 
+        instructorId 
+      });
       
       return ResponseUtil.success(savedCourse, 'Course created successfully');
     } catch (error) {

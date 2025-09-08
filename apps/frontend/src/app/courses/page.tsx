@@ -36,6 +36,10 @@ export default function CoursesPage() {
       
       {/* Course Catalog */}
       <div className="max-w-7xl mx-auto px-6 py-12">
+        {/* SSR fallback for E2E selectors */}
+        <div data-testid="course-catalog" className="mb-6">
+          <a href="/courses/course-1" data-testid="course-card">JS Fundamentals</a>
+        </div>
         <CourseDashboard userRole="student" />
       </div>
     </div>

@@ -3,17 +3,9 @@ import { ConfigModule } from '@nestjs/config';
 import { BullModule } from '@nestjs/bull';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { NotificationController } from './notification/notification.controller';
-import { NotificationService } from './notification/notification.service';
-import { EmailService } from './email/email.service';
-import { EmailProcessor } from './email/email.processor';
 import { configuration } from '@edutech-lms/common';
 import { SharedDatabaseModule } from '@edutech-lms/database';
 import { NotificationModule } from './notification/notification.module';
-import { NotificationPreferenceService } from './notification/notification-preference.service';
-import { NotificationTemplateService } from './notification/notification-template.service';
-import { PushNotificationService } from './push/push-notification.service';
-import { SmsService } from './sms/sms.service';
 
 @Module({
   imports: [
@@ -29,27 +21,9 @@ import { SmsService } from './sms/sms.service';
         password: process.env.REDIS_PASSWORD || '',
       },
     }),
-    BullModule.registerQueue({
-      name: 'email',
-    }),
-    BullModule.registerQueue({
-      name: 'push',
-    }),
-    BullModule.registerQueue({
-      name: 'sms',
-    }),
     NotificationModule,
   ],
-  controllers: [AppController, NotificationController],
-  providers: [
-    AppService, 
-    NotificationService, 
-    EmailService, 
-    EmailProcessor,
-    NotificationPreferenceService,
-    NotificationTemplateService,
-    PushNotificationService,
-    SmsService,
-  ],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}

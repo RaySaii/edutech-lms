@@ -9,6 +9,7 @@ import {
   AssessmentType,
   AssessmentStatus,
   QuestionType,
+  DifficultyLevel,
   AttemptStatus,
 } from '@edutech-lms/database';
 import { CacheService, Cacheable, CacheEvict } from '@edutech-lms/common';
@@ -37,7 +38,7 @@ export interface CreateQuestionDto {
   explanation?: string;
   points: number;
   order: number;
-  difficulty: string;
+  difficulty: DifficultyLevel;
   questionData: any;
 }
 
@@ -308,7 +309,7 @@ export class AssessmentService {
       throw new BadRequestException('Assessment attempt is not active');
     }
 
-    const question = await this.questionRepository.findById(answerDto.questionId);
+    const question = await this.questionRepository.findOne({ where: { id: answerDto.questionId } });
     if (!question || question.assessmentId !== attempt.assessmentId) {
       throw new BadRequestException('Invalid question');
     }

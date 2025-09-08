@@ -514,7 +514,7 @@ export function CourseDashboard({ userRole = 'instructor' }: CourseDashboardProp
 
       {/* Courses Grid */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" data-testid="course-grid">
           {[...Array(UI_CONFIG.SKELETON_COUNT)].map((_, i) => (
             <div key={i} className="bg-white border border-gray-200 rounded-lg overflow-hidden animate-pulse">
               <div className="w-full h-48 bg-gray-200"></div>
@@ -578,9 +578,9 @@ export function CourseDashboard({ userRole = 'instructor' }: CourseDashboardProp
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" data-testid="course-catalog">
           {courses.map((course) => (
-            <Link key={course.id} href={`/courses/${course.id}`} className="block">
+            <Link key={course.id} href={`/courses/${course.id}`} className="block" data-testid="course-card">
               <div className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow duration-200 cursor-pointer">
               {/* Course Thumbnail */}
               <div className="relative">

@@ -13,7 +13,7 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
   const resolvedParams = React.use(params);
   
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white course-detail">
       <CourseDetailView courseId={resolvedParams.id} />
     </div>
   );

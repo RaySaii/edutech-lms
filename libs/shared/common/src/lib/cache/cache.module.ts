@@ -16,7 +16,7 @@ export interface CacheModuleOptions {
 @Module({})
 export class CacheModule {
   static forRoot(options: CacheModuleOptions = {}): DynamicModule {
-    const providers = [
+    const providers: any[] = [
       CacheService,
       {
         provide: 'CACHE_OPTIONS',

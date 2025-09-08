@@ -33,6 +33,9 @@ export interface UploadedFile {
   uploadedAt: Date;
   uploadedBy: string;
   checksum: string;
+  thumbnailId?: string;
+  integrityValid?: boolean;
+  metadata?: FileMetadata;
 }
 
 export interface FileMetadata {

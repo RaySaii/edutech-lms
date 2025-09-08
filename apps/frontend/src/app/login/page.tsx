@@ -26,9 +26,9 @@ export default function AuthPage() {
     <div className="min-h-screen bg-gradient-to-br from-background to-muted flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
-          <h2 className="text-4xl font-extrabold tracking-tight">
+          <h1 className="text-4xl font-extrabold tracking-tight">
             EduTech LMS
-          </h2>
+          </h1>
           <p className="text-muted-foreground mt-2">Your Learning Management System</p>
         </div>
 

@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { APP_INTERCEPTOR, APP_FILTER } from '@nestjs/core';
 import { SharedAuthModule } from '@edutech-lms/auth';
+import { SharedDatabaseModule } from '@edutech-lms/database';
 import { 
   GlobalExceptionFilter, 
   LoggingInterceptor, 
@@ -20,12 +21,14 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { PaymentModule } from './payment/payment.module';
 import { NotificationModule } from './notification/notification.module';
-import { SearchModule } from './search/search.module';
 import { ContentManagementModule } from './content-management/content-management.module';
 import { CacheModule } from './cache/cache.module';
 import { RateLimitingModule } from './rate-limiting/rate-limiting.module';
 import { FilesModule } from './files/files.module';
 import { AssessmentsModule } from './assessments/assessments.module';
+import { MobileModule } from './mobile/mobile.module';
+import { AIRecommendationsModule } from './ai-recommendations/ai-recommendations.module';
+import { GamificationModule } from './gamification/gamification.module';
 import { ResponseTransformInterceptor } from '../common/interceptors/response-transform.interceptor';
 
 @Module({
@@ -39,6 +42,7 @@ import { ResponseTransformInterceptor } from '../common/interceptors/response-tr
     }]),
     SharedRateLimitingModule.forRoot(),
     SharedFileUploadModule.forRoot(),
+    SharedDatabaseModule,
     SharedAuthModule,
     AuthModule,
     CourseModule,
@@ -48,12 +52,16 @@ import { ResponseTransformInterceptor } from '../common/interceptors/response-tr
     AnalyticsModule,
     PaymentModule,
     NotificationModule,
-    SearchModule,
     ContentManagementModule,
     CacheModule,
     RateLimitingModule,
     FilesModule,
     AssessmentsModule,
+    // SearchModule is disabled in local dev to avoid ES client typing conflicts
+    // VideoModule disabled to avoid WebSocket driver requirement when not installed
+    MobileModule,
+    AIRecommendationsModule,
+    GamificationModule,
   ],
   controllers: [AppController],
   providers: [

@@ -264,19 +264,22 @@ export class FileManagementController {
               useS3: fileType === 'videos' || fileType === 'documents',
             });
 
+            // Create enhanced response object
+            let enhancedFile: any = { ...uploadedFile };
+
             // Generate thumbnails for images and course thumbnail
             if (fileType === 'images' || fileType === 'thumbnail') {
               const thumbnailId = await this.fileUploadService.generateThumbnail(uploadedFile.id);
-              uploadedFile.thumbnailId = thumbnailId;
+              enhancedFile.thumbnailId = thumbnailId;
             }
 
             // Get metadata for videos
             if (fileType === 'videos') {
               const metadata = await this.fileUploadService.getFileMetadata(uploadedFile.id);
-              uploadedFile.metadata = metadata;
+              enhancedFile.metadata = metadata;
             }
 
-            results[fileType].push(uploadedFile);
+            results[fileType].push(enhancedFile);
           } catch (error) {
             this.logger.error(`Failed to upload ${fileType} file ${file.originalname}:`, error);
             results[fileType].push({

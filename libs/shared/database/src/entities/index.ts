@@ -16,3 +16,25 @@ export * from './assessment.entity';
 export * from './assessment-question.entity';
 export * from './assessment-attempt.entity';
 export * from './assessment-answer.entity';
+export * from './video.entity';
+export * from './video-playlist.entity';
+export * from './video-assessment.entity';
+export * from './video-comment.entity';
+
+// Multi-tenant entities
+export * from './multi-tenant.entity';
+
+// Analytics entities
+export * from './analytics.entity';
+
+// Mobile app entities
+export * from './mobile-app.entity';
+
+// AI recommendations entities
+export * from './ai-recommendations.entity';
+
+// Gamification entities
+export * from './gamification.entity';
+
+// Advanced search entities
+export * from './search.entity';

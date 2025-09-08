@@ -55,44 +55,28 @@ export function useDashboard(): DashboardData {
             value: learningStats.enrolledCourses,
             icon: BookOpen,
             color: 'blue',
-            description: 'Active course enrollments',
-            trend: {
-              value: 5.2,
-              isPositive: true
-            }
+            description: 'Active course enrollments'
           },
           {
             title: 'Completed',
             value: learningStats.completedCourses,
             icon: Award,
             color: 'green',
-            description: 'Successfully finished courses',
-            trend: {
-              value: 12.3,
-              isPositive: true
-            }
+            description: 'Successfully finished courses'
           },
           {
             title: 'Progress',
             value: `${learningStats.averageProgress.toFixed(1)}%`,
             icon: BarChart3,
             color: 'purple',
-            description: 'Overall learning progress',
-            trend: {
-              value: 8.1,
-              isPositive: true
-            }
+            description: 'Overall learning progress'
           },
           {
             title: 'Learning Time',
             value: `${Math.floor(learningStats.totalHours)}h`,
             icon: Clock,
             color: 'orange',
-            description: 'Total time invested',
-            trend: {
-              value: 15.7,
-              isPositive: true
-            }
+            description: 'Total time invested'
           }
         ];
 

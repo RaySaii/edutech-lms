@@ -31,21 +31,29 @@ async function bootstrap() {
     forbidNonWhitelisted: true,
   }));
 
-  // Swagger documentation
-  const config = new DocumentBuilder()
-    .setTitle('EduTech LMS API')
-    .setDescription('Learning Management System API')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  // Swagger documentation (gated by env)
+  const enableSwagger = process.env.ENABLE_SWAGGER
+    ? process.env.ENABLE_SWAGGER === 'true'
+    : process.env.NODE_ENV !== 'production';
 
-  const port = process.env.PORT || 3000;
+  if (enableSwagger) {
+    const config = new DocumentBuilder()
+      .setTitle('EduTech LMS API')
+      .setDescription('Learning Management System API')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document);
+  }
+
+  const port = process.env.API_GATEWAY_PORT || 3000;
   await app.listen(port);
 
   Logger.log(`🚀 API Gateway is running on: http://localhost:${port}/${globalPrefix}`);
-  Logger.log(`📖 API Documentation: http://localhost:${port}/${globalPrefix}/docs`);
+  if (enableSwagger) {
+    Logger.log(`📖 API Documentation: http://localhost:${port}/${globalPrefix}/docs`);
+  }
 }
 
 bootstrap();

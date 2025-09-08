@@ -112,6 +112,7 @@ export function MainNavigation() {
           <div className="hidden md:flex items-center space-x-4">
             {/* Notifications */}
             <button 
+              data-testid="notification-bell"
               onClick={() => setIsNotificationOpen(!isNotificationOpen)}
               className="relative p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-md"
             >
@@ -175,6 +176,7 @@ export function MainNavigation() {
           {/* Mobile Menu Button */}
           <div className="md:hidden">
             <button
+              data-testid="mobile-menu-button"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
             >
@@ -190,7 +192,7 @@ export function MainNavigation() {
 
       {/* Mobile Menu */}
       {isMenuOpen && (
-        <div className="md:hidden border-t border-gray-200 bg-white">
+        <div className="md:hidden border-t border-gray-200 bg-white" data-testid="mobile-menu">
           <div className="px-4 py-3 space-y-2">
             {navigationItems.map((item) => {
               const Icon = item.icon;
@@ -204,6 +206,7 @@ export function MainNavigation() {
                       ? 'text-purple-600 bg-purple-50'
                       : 'text-gray-600 hover:text-purple-600 hover:bg-gray-50'
                   }`}
+                  data-testid={item.name === 'Courses' ? 'mobile-nav-courses' : undefined}
                 >
                   <Icon className="h-5 w-5" />
                   <span>{item.name}</span>

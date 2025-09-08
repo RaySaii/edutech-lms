@@ -5,11 +5,13 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  OneToMany,
   JoinColumn,
   Index,
 } from 'typeorm';
 import { User } from './user.entity';
 import { Course } from './course.entity';
+import { Video } from './video.entity';
 
 export enum ContentType {
   VIDEO = 'video',
@@ -120,6 +122,9 @@ export class Content {
 
   @Column({ default: 0 })
   downloadCount: number;
+
+  @OneToMany(() => Video, video => video.content)
+  videos: Video[];
 
   @CreateDateColumn()
   createdAt: Date;

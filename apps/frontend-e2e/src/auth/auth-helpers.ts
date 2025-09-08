@@ -22,23 +22,24 @@ export const generateUniqueEmail = () => `e2etest${Date.now()}@example.com`;
 
 export const generateSecTestEmail = () => `sectest${Date.now()}@example.com`;
 
-// Get base URL from environment or default to localhost:3000
-const getBaseUrl = () => process.env.BASE_URL || 'http://localhost:3000';
+// Get base URL from environment or default to frontend dev server (4200)
+const getBaseUrl = () => process.env.BASE_URL || 'http://localhost:4200';
 
 // Navigation helpers
 export const navigateToLogin = async (page: Page) => {
-  await page.goto(`${getBaseUrl()}/login`);
-  await expect(page.getByTestId('login-form')).toBeVisible();
+  // Prefer relative navigation to respect Playwright baseURL
+  await page.goto('/login');
+  await expect(page.getByTestId('login-form')).toBeVisible({ timeout: 15000 });
 };
 
 export const navigateToRegister = async (page: Page) => {
-  await page.goto(`${getBaseUrl()}/register`);
-  await expect(page.getByTestId('register-form')).toBeVisible();
+  await page.goto('/register');
+  await expect(page.getByTestId('register-form')).toBeVisible({ timeout: 15000 });
 };
 
 export const navigateToForgotPassword = async (page: Page) => {
-  await page.goto(`${getBaseUrl()}/forgot-password`);
-  await expect(page.getByTestId('forgot-password-form')).toBeVisible();
+  await page.goto('/forgot-password');
+  await expect(page.getByTestId('forgot-password-form')).toBeVisible({ timeout: 15000 });
 };
 
 // Assertion helpers

@@ -565,10 +565,10 @@ export function CourseDetailView({ courseId }: CourseDetailViewProps) {
                   {expandedSections.has(section.id) && (
                     <div className="border-t bg-gray-50">
                       {section.lessons.map((lesson) => (
-                        <div key={lesson.id} className="flex items-center justify-between p-3 border-b last:border-b-0">
+                        <div key={lesson.id} className="flex items-center justify-between p-3 border-b last:border-b-0" data-testid="lesson-item">
                           <div className="flex items-center gap-3">
                             {lesson.isPreview ? (
-                              <PlayCircle className="h-4 w-4 text-blue-500" />
+                              <PlayCircle className="h-4 w-4 text-blue-500" data-testid="video-icon" />
                             ) : (
                               <Lock className="h-4 w-4 text-gray-400" />
                             )}

@@ -8,6 +8,7 @@ export interface CacheOptions {
   tags?: string[]; // Tags for cache invalidation
   compressed?: boolean; // Whether to compress the data
   serialize?: boolean; // Whether to serialize objects
+  skipCache?: boolean; // Skip cache for specific operations
 }
 
 export interface CacheKey {
@@ -65,7 +66,6 @@ export class CacheService implements OnModuleInit {
           host: redisHost,
           port: redisPort,
           password: redisPassword,
-          retryDelayOnFailover: 100,
           maxRetriesPerRequest: 3,
           lazyConnect: true,
         });

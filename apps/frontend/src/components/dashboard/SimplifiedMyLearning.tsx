@@ -267,7 +267,7 @@ export function SimplifiedMyLearning() {
         }
       ]}
       loading={loading}
-      error={error}
+      error={error || undefined}
       onRetry={refetch}
     />
   );

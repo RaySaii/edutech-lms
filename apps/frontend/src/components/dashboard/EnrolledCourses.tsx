@@ -154,6 +154,7 @@ const EnrolledCourses = React.memo<EnrolledCoursesProps>(({ courses, loading = f
           {userRole === 'admin' ? 'Course Management' : 'Continue Learning'}
         </h3>
         <button
+          data-testid="view-all-courses"
           onClick={() => router.push(userRole === 'admin' ? '/courses' : '/courses/my-learning')}
           className="text-sm text-blue-600 hover:text-blue-800 font-medium"
         >
@@ -166,6 +167,8 @@ const EnrolledCourses = React.memo<EnrolledCoursesProps>(({ courses, loading = f
           const course = normalizeCourse(item);
           return (
           <div
+            data-testid="course-card"
+            data-testid="enrolled-course"
             key={course.id}
             className="border rounded-lg p-4 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
             onClick={() => handleCourseClick(course.id)}

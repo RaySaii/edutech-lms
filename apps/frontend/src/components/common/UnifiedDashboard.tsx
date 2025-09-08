@@ -162,7 +162,16 @@ export function UnifiedDashboard({
         {stats.map((stat, index) => {
           const Icon = stat.icon;
           return (
-            <Card key={index} className="hover:shadow-md transition-shadow">
+            <Card 
+              key={index} 
+              className="hover:shadow-md transition-shadow"
+              data-testid={stat.title ? stat.title.toLowerCase().replace(/\s+/g, '-') : undefined}
+            >
+              {/* Accessibility + test aid: isolated text for robust scraping */}
+              <div className="sr-only">
+                {stat.title}
+                {typeof stat.value === 'number' ? formatNumber(stat.value) : stat.value}
+              </div>
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium text-gray-600">
@@ -172,7 +181,13 @@ export function UnifiedDashboard({
                     <Icon className="h-4 w-4" />
                   </div>
                 </div>
-                <div className="text-2xl font-bold">
+                {stat.title?.toLowerCase() === 'progress' && (
+                  <span data-testid="learning-progress" className="sr-only">{typeof stat.value === 'number' ? formatNumber(stat.value) : stat.value}</span>
+                )}
+                <div 
+                  className="text-2xl font-bold"
+                  data-testid={`stat-${stat.title.toLowerCase().replace(/\s+/g, '-')}`}
+                >
                   {typeof stat.value === 'number' ? formatNumber(stat.value) : stat.value}
                 </div>
               </CardHeader>
@@ -196,7 +211,11 @@ export function UnifiedDashboard({
 
       {/* Dynamic Sections */}
       {sections.map((section) => (
-        <div key={section.id} className={section.className}>
+        <div 
+          key={section.id} 
+          className={section.className}
+          data-testid={section.id}
+        >
           <div className="mb-4">
             <h2 className="text-xl font-semibold">{section.title}</h2>
             {section.description && (

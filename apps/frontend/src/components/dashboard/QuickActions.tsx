@@ -10,9 +10,11 @@ interface QuickActionsProps {
 
 export default function QuickActions({ userRole }: QuickActionsProps) {
   const router = useRouter();
+  const normalizedRole = (userRole || '').toString().trim().toUpperCase();
+  const isInstructor = normalizedRole === 'INSTRUCTOR' || normalizedRole === 'TEACHER';
 
   const getActions = () => {
-    if (userRole === 'teacher') {
+    if (isInstructor) {
       return [
         {
           title: 'Create Course',

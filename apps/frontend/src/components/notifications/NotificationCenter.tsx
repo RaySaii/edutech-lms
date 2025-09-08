@@ -199,7 +199,7 @@ export function NotificationCenter({ isOpen, onClose }: NotificationCenterProps)
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-end p-4 pointer-events-none">
-      <Card className="w-96 max-h-[600px] pointer-events-auto shadow-xl border bg-white">
+      <Card className="w-96 max-h-[600px] pointer-events-auto shadow-xl border bg-white" data-testid="notification-dropdown">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -256,6 +256,7 @@ export function NotificationCenter({ isOpen, onClose }: NotificationCenterProps)
                 {filteredNotifications.map((notification) => (
                   <div
                     key={notification.id}
+                    data-testid="notification-item"
                     className={`p-4 hover:bg-gray-50 transition-colors ${
                       !notification.isRead ? 'bg-blue-50/50' : ''
                     }`}

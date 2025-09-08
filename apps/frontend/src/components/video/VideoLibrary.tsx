@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   Search, 
   Filter, 
@@ -10,106 +11,204 @@ import {
   Users,
   BookOpen,
   Subtitles,
-  FileText
+  FileText,
+  Eye,
+  Bookmark,
+  Grid,
+  List,
+  Tag,
+  Calendar,
+  TrendingUp
 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
 import { Card, CardContent } from '../ui/card';
-import { videoLibrary, VideoSource, formatVideoDuration, getVideosByCategory } from '../../lib/videoSources';
+
+interface Video {
+  id: string;
+  title: string;
+  description?: string;
+  thumbnailPath?: string;
+  duration: number;
+  status: string;
+  viewCount: number;
+  createdAt: string;
+  isPublic: boolean;
+  uploader: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  tags?: string[];
+  difficulty?: 'beginner' | 'intermediate' | 'advanced';
+  category?: string;
+  rating?: number;
+  isBookmarked?: boolean;
+  progress?: {
+    currentTime: number;
+    completionPercentage: number;
+    completed: boolean;
+  };
+}
 
 interface VideoLibraryProps {
-  onVideoSelect?: (video: VideoSource) => void;
+  onVideoSelect?: (video: Video) => void;
+  contentId?: string;
+  courseId?: string;
+  userId?: string;
   selectedCategory?: string;
   showFilters?: boolean;
   compact?: boolean;
+  viewMode?: 'grid' | 'list';
 }
 
 export function VideoLibrary({ 
-  onVideoSelect, 
+  onVideoSelect,
+  contentId,
+  courseId, 
+  userId,
   selectedCategory,
   showFilters = true,
-  compact = false 
+  compact = false,
+  viewMode: initialViewMode = 'grid'
 }: VideoLibraryProps) {
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState(selectedCategory || '');
   const [difficultyFilter, setDifficultyFilter] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState('newest');
-  const [showOnlyWithSubtitles, setShowOnlyWithSubtitles] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(initialViewMode);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const router = useRouter();
 
-  const categories = useMemo(() => {
-    const cats = Array.from(new Set(videoLibrary.map(v => v.category)));
-    return cats.sort();
-  }, []);
+  useEffect(() => {
+    loadVideos();
+    loadFilters();
+  }, [currentPage, searchQuery, categoryFilter, difficultyFilter, selectedTags, sortBy, contentId, courseId, userId]);
 
-  const subcategories = useMemo(() => {
-    if (!categoryFilter) return [];
-    const subcats = Array.from(new Set(
-      videoLibrary
-        .filter(v => v.category === categoryFilter)
-        .map(v => v.subcategory)
-    ));
-    return subcats.sort();
-  }, [categoryFilter]);
+  const loadVideos = async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: compact ? '6' : '12',
+        sort: sortBy,
+        order: 'desc',
+        status: 'ready',
+      });
 
-  const filteredVideos = useMemo(() => {
-    let filtered = videoLibrary;
-
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(video =>
-        video.title.toLowerCase().includes(query) ||
-        video.description.toLowerCase().includes(query) ||
-        video.instructor.toLowerCase().includes(query) ||
-        video.tags.some(tag => tag.toLowerCase().includes(query))
-      );
-    }
-
-    // Category filter
-    if (categoryFilter) {
-      filtered = filtered.filter(video => video.category === categoryFilter);
-    }
-
-    // Difficulty filter
-    if (difficultyFilter) {
-      filtered = filtered.filter(video => video.difficulty === difficultyFilter);
-    }
-
-    // Subtitles filter
-    if (showOnlyWithSubtitles) {
-      filtered = filtered.filter(video => video.hasSubtitles);
-    }
-
-    // Sorting
-    filtered = filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'title':
-          return a.title.localeCompare(b.title);
-        case 'duration-short':
-          return a.duration - b.duration;
-        case 'duration-long':
-          return b.duration - a.duration;
-        case 'difficulty':
-          const difficultyOrder = ['beginner', 'intermediate', 'advanced', 'expert'];
-          return difficultyOrder.indexOf(a.difficulty) - difficultyOrder.indexOf(b.difficulty);
-        case 'newest':
-        default:
-          return b.id.localeCompare(a.id); // Assuming IDs are chronological
+      if (searchQuery) {
+        params.append('search', searchQuery);
       }
-    });
 
-    return filtered;
-  }, [searchQuery, categoryFilter, difficultyFilter, sortBy, showOnlyWithSubtitles]);
+      if (contentId) {
+        params.append('contentId', contentId);
+      }
 
-  const handleVideoClick = (video: VideoSource) => {
-    if (onVideoSelect) {
-      onVideoSelect(video);
+      if (courseId) {
+        params.append('courseId', courseId);
+      }
+
+      if (userId) {
+        params.append('userId', userId);
+      }
+
+      if (categoryFilter) {
+        params.append('category', categoryFilter);
+      }
+
+      if (difficultyFilter) {
+        params.append('difficulty', difficultyFilter);
+      }
+
+      if (selectedTags.length > 0) {
+        params.append('tags', selectedTags.join(','));
+      }
+
+      const response = await fetch(`/api/videos/library?${params}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setVideos(data.videos);
+        setTotalPages(Math.ceil(data.total / (compact ? 6 : 12)));
+      }
+    } catch (error) {
+      console.error('Failed to load videos:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getDifficultyColor = (difficulty: string) => {
+  const loadFilters = async () => {
+    try {
+      const response = await fetch('/api/videos/filters', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableTags(data.tags || []);
+        setAvailableCategories(data.categories || []);
+      }
+    } catch (error) {
+      console.error('Failed to load filters:', error);
+    }
+  };
+
+  const handleVideoClick = (video: Video) => {
+    if (onVideoSelect) {
+      onVideoSelect(video);
+    } else {
+      router.push(`/videos/${video.id}/play`);
+    }
+  };
+
+  const handleBookmark = async (e: React.MouseEvent, videoId: string) => {
+    e.stopPropagation();
+    try {
+      const response = await fetch(`/api/videos/${videoId}/bookmark`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      if (response.ok) {
+        setVideos(prev => prev.map(video => 
+          video.id === videoId 
+            ? { ...video, isBookmarked: !video.isBookmarked }
+            : video
+        ));
+      }
+    } catch (error) {
+      console.error('Failed to bookmark video:', error);
+    }
+  };
+
+  const handleTagToggle = (tag: string) => {
+    setSelectedTags(prev => 
+      prev.includes(tag)
+        ? prev.filter(t => t !== tag)
+        : [...prev, tag]
+    );
+    setCurrentPage(1);
+  };
+
+  const getDifficultyColor = (difficulty?: string) => {
     const colors = {
       beginner: 'bg-green-100 text-green-800',
       intermediate: 'bg-blue-100 text-blue-800',
@@ -119,31 +218,74 @@ export function VideoLibrary({
     return colors[difficulty as keyof typeof colors] || colors.beginner;
   };
 
+  const formatDuration = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  };
+
   if (compact) {
     return (
       <div className="space-y-4">
-        {filteredVideos.slice(0, 6).map((video) => (
-          <div
-            key={video.id}
-            onClick={() => handleVideoClick(video)}
-            className="flex gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors"
-          >
-            <img
-              src={video.thumbnail}
-              alt={video.title}
-              className="w-20 h-12 object-cover rounded flex-shrink-0"
-            />
-            <div className="flex-1 min-w-0">
-              <h4 className="font-medium text-sm text-gray-900 line-clamp-1">{video.title}</h4>
-              <p className="text-xs text-gray-600 mt-1">{video.instructor}</p>
-              <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                <Clock className="h-3 w-3" />
-                <span>{formatVideoDuration(video.duration)}</span>
-                {video.hasSubtitles && <Subtitles className="h-3 w-3" />}
+        {loading ? (
+          [...Array(3)].map((_, i) => (
+            <div key={i} className="flex gap-3 p-3 animate-pulse">
+              <div className="w-20 h-12 bg-gray-200 rounded flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="h-4 bg-gray-200 rounded mb-2" />
+                <div className="h-3 bg-gray-200 rounded w-1/2" />
               </div>
             </div>
-          </div>
-        ))}
+          ))
+        ) : (
+          videos.map((video) => (
+            <div
+              key={video.id}
+              onClick={() => handleVideoClick(video)}
+              className="flex gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors"
+            >
+              <div className="relative w-20 h-12 bg-gray-900 rounded overflow-hidden flex-shrink-0">
+                {video.thumbnailPath ? (
+                  <img
+                    src={`/api/videos/${video.id}/thumbnail`}
+                    alt={video.title}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <Play className="h-4 w-4 text-white opacity-60" />
+                  </div>
+                )}
+                {video.progress && video.progress.completionPercentage > 0 && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black bg-opacity-50">
+                    <div 
+                      className="h-full bg-purple-600"
+                      style={{ width: `${video.progress.completionPercentage}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-medium text-sm text-gray-900 line-clamp-1">{video.title}</h4>
+                <p className="text-xs text-gray-600 mt-1">
+                  {video.uploader.firstName} {video.uploader.lastName}
+                </p>
+                <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                  <Clock className="h-3 w-3" />
+                  <span>{formatDuration(video.duration)}</span>
+                  <Eye className="h-3 w-3" />
+                  <span>{video.viewCount}</span>
+                  {video.isBookmarked && <Bookmark className="h-3 w-3 text-yellow-600" />}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     );
   }
